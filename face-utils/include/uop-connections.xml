@@ -1,0 +1,27 @@
+<!--
+    uop-connections.xml
+    Each connection-table must use ONE of the two child forms:
+      1. connection_list  – explicit, per-connection entries
+      2. all-connections  – a single entry that applies to every connection
+-->
+<uop-connection-config>
+
+    <!-- Form 1: explicit per-connection list -->
+    <connection-table uop_name="uop1">
+        <connection_list>
+            <connection name="connection1" base="" typed_ts=""/>
+            <connection name="connection2" base="" typed_ts=""/>
+        </connection_list>
+    </connection-table>
+
+    <!--
+    Form 2 (alternate): all-connections – applies one base/typed_ts to every
+    connection owned by the UOP.  Use this form when all connections share the
+    same settings and an explicit list is not needed.
+
+    <connection-table uop_name="uop2">
+        <all-connections base="" typed_ts=""/>
+    </connection-table>
+    -->
+
+</uop-connection-config>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+    <!--
+        Schema for uop-connections.xml.
+        Each connection-table must contain EITHER a connection_list OR an
+        all-connections element, but not both.
+    -->
+
+    <xs:element name="uop-connection-config">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="connection-table"
+                            type="connection-table-type"
+                            minOccurs="1"
+                            maxOccurs="unbounded"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- A connection-table owns exactly one of the two child forms -->
+    <xs:complexType name="connection-table-type">
+        <xs:choice>
+            <xs:element name="connection_list"   type="connection-list-type"/>
+            <xs:element name="all-connections"   type="connection-attrs-type"/>
+        </xs:choice>
+        <xs:attribute name="uop_name" type="xs:string" use="required"/>
+    </xs:complexType>
+
+    <!-- connection_list holds one or more individual connection entries -->
+    <xs:complexType name="connection-list-type">
+        <xs:sequence>
+            <xs:element name="connection"
+                        type="connection-type"
+                        minOccurs="1"
+                        maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- A single named connection -->
+    <xs:complexType name="connection-type">
+        <xs:attribute name="name"     type="xs:string" use="required"/>
+        <xs:attribute name="base"     type="xs:string" use="required"/>
+        <xs:attribute name="typed_ts" type="xs:string" use="required"/>
+    </xs:complexType>
+
+    <!-- all-connections applies the same base/typed_ts to every connection -->
+    <xs:complexType name="connection-attrs-type">
+        <xs:attribute name="base"     type="xs:string" use="required"/>
+        <xs:attribute name="typed_ts" type="xs:string" use="required"/>
+    </xs:complexType>
+
+</xs:schema>
