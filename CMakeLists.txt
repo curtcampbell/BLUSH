@@ -36,17 +36,16 @@ endif()
 #
 # UoP code that plugs into FACE::Core / FACE::Util (Injectable interfaces,
 # TypedTS connections, uop-connections.xml wiring) is generated with the
-# face-idl-gen / face-idl-binder / face-codegen CLI tools from that project.
-# They are standalone tools, not a CMake package, and this build does not
-# invoke them -- they're only needed by consumers generating UoP glue code.
+# face-idl-gen / face-codegen CLI tools from that project, driven by the
+# templates in uop-generator/. blush_add_uop_libraries() (cmake/BLUSHUopCodegen.cmake)
+# wraps that pipeline; uop-generator's own CMakeLists.txt uses it as a
+# worked example, and downstream consumers get it via find_package(BLUSH).
 # ---------------------------------------------------------------------------
-find_program(FACE_IDL_GEN_EXECUTABLE face-idl-gen)
-if(NOT FACE_IDL_GEN_EXECUTABLE)
-    message(STATUS "face-idl-gen not found on PATH (only needed for FACE IDL code generation, not for building BLUSH).")
-endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BLUSHUopCodegen.cmake")
 
 add_subdirectory(face-core)
 add_subdirectory(face-utils)
+add_subdirectory(uop-generator)
 
 # ---------------------------------------------------------------------------
 # Package export so downstream projects can find_package(BLUSH)
@@ -77,4 +76,14 @@ install(
     FILE BLUSHTargets.cmake
     NAMESPACE FACE::
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/BLUSH"
+)
+
+install(
+    FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/BLUSHUopCodegen.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/BLUSH"
+)
+
+install(
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/uop-generator/templates/"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/blush/uop-templates"
 )

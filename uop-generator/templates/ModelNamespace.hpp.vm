@@ -14,8 +14,8 @@
 ## (no typedef is needed; the struct already lives directly in the namespace).
 ##
 #set ($guardSymbol = "FACE_DM_${modelNamespace.toUpperCase()}_HPP")
-\#pragma once
-\#ifndef ${guardSymbol}
+#pragma once
+#ifndef ${guardSymbol}
 \#define ${guardSymbol}
 
 ## ── Includes ────────────────────────────────────────────────────────────────
@@ -51,4 +51,4 @@ typedef T_${type.name}::${type.name} ${type.name};
 } // namespace FACE
 #end ## hasAliases
 
-\#endif // ${guardSymbol}
+#endif // ${guardSymbol}

@@ -21,8 +21,8 @@ add_library(${uop.name}_lib STATIC
 )
 
 target_include_directories(${uop.name}_lib
-    PUBLIC  $<BUILD_INTERFACE:\${CMAKE_CURRENT_SOURCE_DIR}/include>
-    PRIVATE $<BUILD_INTERFACE:\${CMAKE_CURRENT_SOURCE_DIR}/src>
+    PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 )
 
 target_link_libraries(${uop.name}_lib

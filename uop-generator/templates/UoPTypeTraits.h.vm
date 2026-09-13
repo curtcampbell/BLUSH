@@ -24,10 +24,24 @@
 ## Derive include-guard symbol from UoP name
 ##
 #set ($guardSymbol = "${uop.name.toUpperCase()}_TYPE_TRAITS_H")
-\#ifndef ${guardSymbol}
+##
+## Collect unique model namespaces so we can include each one's convenience
+## header (FACE/DM/<ns>/<ns>.hpp) -- DECLARE_FACE_TYPE_TRAITS below needs the
+## DM/TSS types it references to already be visible.
+##
+#set ($modelNamespaces = [])
+#foreach ($type in $uniqueTypes)
+  #if (!$modelNamespaces.contains($type.modelNamespace))
+    #if ($modelNamespaces.add($type.modelNamespace))#end
+  #end
+#end
+#ifndef ${guardSymbol}
 \#define ${guardSymbol}
 
 \#include "FaceTypeTraits.h"
+#foreach ($ns in $modelNamespaces)
+\#include "FACE/DM/${ns}/${ns}.hpp"
+#end
 
 #foreach ($type in $uniqueTypes)
   #if ($type.compositeTemplate)
@@ -37,4 +51,4 @@ DECLARE_FACE_TYPE_TRAITS($type.modelNamespace, $type.name)
   #end
 #end
 
-\#endif // ${guardSymbol}
+#endif // ${guardSymbol}
