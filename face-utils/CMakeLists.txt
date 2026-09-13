@@ -4,7 +4,10 @@
 # ConnectionResolver, task scheduling, and a vendored tinyxml2 for parsing
 # uop-connections.xml.
 
-add_library(face_util
+# Explicitly STATIC (not left to BUILD_SHARED_LIBS): UoP shared objects that
+# link this are meant to be self-contained plugins with no runtime ABI
+# dependency on a separately-versioned libface_util.so.
+add_library(face_util STATIC
     src/TaskRunner.cpp
     src/TaskScheduler.cpp
     src/tinyxml2.cpp

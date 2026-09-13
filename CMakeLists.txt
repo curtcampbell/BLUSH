@@ -14,6 +14,18 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
 endif()
 
+# Every BLUSH library -- including static ones like face_util -- must be
+# relocatable: a UoP shared object embeds its statically-linked dependencies,
+# which requires those dependencies to have been compiled as position-
+# independent code. Set as the project-wide default (not forced) so it
+# applies to every target created below, including generated <UoP>_lib
+# targets and FetchContent'd dependencies like GoogleTest, while remaining
+# overridable via -DCMAKE_POSITION_INDEPENDENT_CODE=OFF for a toolchain where
+# PIC isn't meaningful (e.g. a single-address-space embedded/RTOS target).
+if(NOT DEFINED CMAKE_POSITION_INDEPENDENT_CODE)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "Build all targets as position-independent code")
+endif()
+
 option(BLUSH_BUILD_TESTS "Build BLUSH tests" ON)
 
 include(GNUInstallDirs)
