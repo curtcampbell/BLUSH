@@ -1,0 +1,28 @@
+generations:
+  - template: UoPTypeTraits.h.vm
+    for_each: UOP
+    output:   "{uop.name}/include/{uop.name}TypeTraits.h"
+  - template: UoPTypeTraits.cpp.vm
+    for_each: UOP
+    output:   "{uop.name}/src/{uop.name}TypeTraits.cpp"
+  - template: ConnectionTable.h.vm
+    for_each: UOP_INTEGRATION_CONTEXT
+    output:   "{uop.name}/include/ConnectionTable/{uop.name}{integrationContext.name}ConnectionTable.h"
+  - template: ConnectionTableImpl.h.vm
+    for_each: UOP_INTEGRATION_CONTEXT
+    output:   "{uop.name}/src/ConnectionTable/{uop.name}{integrationContext.name}ConnectionTableImpl.h"
+  - template: ConnectionTableImpl.cpp.vm
+    for_each: UOP_INTEGRATION_CONTEXT
+    output:   "{uop.name}/src/ConnectionTable/{uop.name}{integrationContext.name}ConnectionTableImpl.cpp"
+  - template: UoPBase.h.vm
+    for_each: UOP
+    output:   "{uop.name}/include/{uop.name}Base.h"
+  - template: UoPBase.cpp.vm
+    for_each: UOP
+    output:   "{uop.name}/src/{uop.name}Base.cpp"
+  - template: UoPCMakeLists.txt.vm
+    for_each: UOP
+    output:   "{uop.name}/CMakeLists.txt"
+  - template: ModelNamespace.hpp.vm
+    for_each: MODEL_NAMESPACE
+    output:   "face-model/include/FACE/DM/{model.namespace}/{model.namespace}.hpp"

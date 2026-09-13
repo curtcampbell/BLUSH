@@ -1,0 +1,54 @@
+##
+## Generated file -- DO NOT EDIT
+## Model namespace: $modelNamespace
+## Re-generate using face-codegen with template ModelNamespace.hpp.vm
+##
+## Aggregate convenience header for FACE::DM::$modelNamespace.
+##
+## For uop:Template types this header:
+##   1. Includes the per-type T_<Name>/<Name>.hpp header.
+##   2. Re-exports a typedef in the model namespace so callers can write
+##      FACE::DM::${modelNamespace}::<Name> instead of the full T_ path.
+##
+## For uop:CompositeTemplate types this header simply includes the header
+## (no typedef is needed; the struct already lives directly in the namespace).
+##
+#set ($guardSymbol = "FACE_DM_${modelNamespace.toUpperCase()}_HPP")
+\#pragma once
+\#ifndef ${guardSymbol}
+\#define ${guardSymbol}
+
+## ── Includes ────────────────────────────────────────────────────────────────
+#foreach ($type in $namespaceTypes)
+  #if ($type.compositeTemplate)
+\#include <FACE/DM/${modelNamespace}/${type.name}.hpp>
+  #else
+\#include <FACE/DM/${modelNamespace}/T_${type.name}/${type.name}.hpp>
+  #end
+#end
+
+## ── Convenience typedefs (uop:Template types only) ──────────────────────────
+#set ($hasAliases = false)
+#foreach ($type in $namespaceTypes)
+  #if (!$type.compositeTemplate)
+    #set ($hasAliases = true)
+  #end
+#end
+#if ($hasAliases)
+namespace FACE {
+namespace DM {
+namespace ${modelNamespace} {
+
+#foreach ($type in $namespaceTypes)
+  #if (!$type.compositeTemplate)
+/// Convenience alias: mirrors the IDL typedef for ${type.name}.
+typedef T_${type.name}::${type.name} ${type.name};
+  #end
+#end
+
+} // namespace ${modelNamespace}
+} // namespace DM
+} // namespace FACE
+#end ## hasAliases
+
+\#endif // ${guardSymbol}

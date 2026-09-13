@@ -1,0 +1,146 @@
+##
+## Generated file -- DO NOT EDIT
+## UoP: $uop.name  /  IntegrationContext: $integrationContext.name
+## Re-generate using face-codegen with template ConnectionTable.h.vm
+##
+##
+## Collect all unique message types (request + response) for #include generation.
+## Deduplication by UUID, first-seen order -- same pattern as UoPTypeTraits.
+##
+#set ($uniqueTypes = [])
+#set ($seenUuids   = [])
+#foreach ($conn in $integrationContext.connections)
+  #if (!$seenUuids.contains($conn.messageType.uuid))
+    #if ($uniqueTypes.add($conn.messageType))#end
+    #if ($seenUuids.add($conn.messageType.uuid))#end
+  #end
+  #if ($conn.responseMessageType)
+    #if (!$seenUuids.contains($conn.responseMessageType.uuid))
+      #if ($uniqueTypes.add($conn.responseMessageType))#end
+      #if ($seenUuids.add($conn.responseMessageType.uuid))#end
+    #end
+  #end
+#end
+##
+## Collect unique response types for IResponseSender interface generation.
+##
+#set ($uniqueRspTypes = [])
+#set ($seenRspUuids   = [])
+#foreach ($conn in $integrationContext.connections)
+  #if ($conn.responseMessageType)
+    #if (!$seenRspUuids.contains($conn.responseMessageType.uuid))
+      #if ($uniqueRspTypes.add($conn.responseMessageType))#end
+      #if ($seenRspUuids.add($conn.responseMessageType.uuid))#end
+    #end
+  #end
+#end
+##
+## Derive include path from $model_namespace (e.g. FACE::DM::SampleUSM -> FACE/DM/SampleUSM).
+## $model_namespace is injected by IdlDerivedVariables and is always available.
+##
+#set ($incPath = $model_namespace.replace("::", "/"))
+##
+## Derive include-guard symbol from UoP name + IntegrationContext name.
+##
+#set ($guardSymbol = "${uop.name.toUpperCase()}_${integrationContext.name.toUpperCase()}_CONNECTION_TABLE_H")
+#ifndef ${guardSymbol}
+\#define ${guardSymbol}
+
+\#include <functional>
+\#include <memory>
+\#include "EventDispatcher.h"
+\#include "FACE/Common.hpp"
+
+#foreach ($type in $uniqueTypes)
+\#include "${incPath}/${type.name}.hpp"
+#end
+
+namespace ${uop.name} {
+
+## ---------------------------------------------------------------------------
+## IResponseSender interfaces -- one per unique CLIENT_SERVER response type.
+## ---------------------------------------------------------------------------
+#foreach ($rspType in $uniqueRspTypes)
+/// Response-sender interface for ${rspType.name}.
+/// Passed to RESPONDER connection handlers; call sendResponse() when the
+/// reply is ready.
+struct I${rspType.name}ResponseSender {
+    virtual void sendResponse(const ::${model_namespace}::${rspType.name}& response) = 0;
+    virtual ~I${rspType.name}ResponseSender() = default;
+};
+
+#end
+## ---------------------------------------------------------------------------
+## ConnectionTable interface
+## ---------------------------------------------------------------------------
+
+/// Connection table interface for UoP ${uop.name}, IntegrationContext ${integrationContext.name}.
+///
+/// Components within the UoP call send___() to transmit outbound messages
+/// and call register___Handler() to subscribe to inbound messages.
+///
+/// send___() returns a FACE::RETURN_CODE_TYPE indicating the transport outcome:
+///   NO_ERROR        — message accepted by the TS
+///   IN_PROGRESS     — async request accepted; response will arrive via callback
+///   NOT_AVAILABLE   — connection has not been wired up yet
+///   (other codes)   — transport-layer errors propagated from FACE TSS
+///
+/// register___Handler() returns a cancellable EventRegistration handle;
+/// dropping or cancelling it unsubscribes the handler.  Returns nullptr if
+/// the underlying connection has not been wired up yet.
+///
+/// The concrete implementation (${uop.name}${integrationContext.name}ConnectionTableImpl)
+/// wires these methods to the underlying FACE TSS transport via the
+/// connection classes (PublisherConnection, SubscriberConnection, etc.).
+class ${uop.name}${integrationContext.name}ConnectionTable {
+public:
+    virtual ~${uop.name}${integrationContext.name}ConnectionTable() = default;
+
+#foreach ($conn in $integrationContext.connections)
+#if ($conn.role.toString() == "PRODUCER")
+    /// Send outbound message on connection ${conn.name}.
+    /// @returns NO_ERROR on success; NOT_AVAILABLE if connection is not wired.
+    virtual FACE::RETURN_CODE_TYPE send${conn.name}(
+        const ::${model_namespace}::${conn.messageType.name}& msg) = 0;
+
+#elseif ($conn.role.toString() == "CONSUMER")
+    /// Register handler for inbound messages on connection ${conn.name}.
+    /// Returns a handle whose lifetime controls the subscription;
+    /// call handle->Cancel() or let it go out of scope to unsubscribe.
+    /// Returns nullptr if the connection has not been wired up yet.
+    /// predicate — optional filter evaluated before each dispatch;
+    ///             an empty (default) predicate always passes.
+    virtual std::shared_ptr<EventRegistration> register${conn.name}Handler(
+        std::function<void(const ::${model_namespace}::${conn.messageType.name}&)> handler,
+        std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate = {}) = 0;
+
+#elseif ($conn.role.toString() == "REQUESTER")
+    /// Send request on connection ${conn.name}.
+    /// responseCallback is invoked asynchronously when the reply arrives.
+    /// @returns NO_ERROR or IN_PROGRESS on success; NOT_AVAILABLE if connection is not wired.
+    virtual FACE::RETURN_CODE_TYPE send${conn.name}(
+        const ::${model_namespace}::${conn.messageType.name}& request,
+        std::function<void(const ::${model_namespace}::${conn.responseMessageType.name}&)> responseCallback) = 0;
+
+#elseif ($conn.role.toString() == "RESPONDER")
+    /// Register handler for inbound requests on connection ${conn.name}.
+    /// The handler receives the request and a response-sender reference;
+    /// call sender.sendResponse() when the reply is ready.
+    /// Returns a handle whose lifetime controls the subscription;
+    /// call handle->Cancel() or let it go out of scope to unsubscribe.
+    /// Returns nullptr if the connection has not been wired up yet.
+    /// predicate — optional filter evaluated before each dispatch;
+    ///             an empty (default) predicate always passes.
+    virtual std::shared_ptr<EventRegistration> register${conn.name}Handler(
+        std::function<void(
+            const ::${model_namespace}::${conn.messageType.name}& request,
+            I${conn.responseMessageType.name}ResponseSender& sender)> handler,
+        std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate = {}) = 0;
+
+#end
+#end
+};
+
+} // namespace ${uop.name}
+
+#endif // ${guardSymbol}

@@ -1,0 +1,111 @@
+##
+## Generated file -- DO NOT EDIT
+## UoP: $uop.name  /  IntegrationContext: $integrationContext.name
+## Re-generate using face-codegen with template ConnectionTableImpl.h.vm
+##
+#set ($guardSymbol = "${uop.name.toUpperCase()}_${integrationContext.name.toUpperCase()}_CONNECTION_TABLE_IMPL_H")
+#ifndef ${guardSymbol}
+\#define ${guardSymbol}
+
+\#include "ConnectionTable/${uop.name}${integrationContext.name}ConnectionTable.h"
+\#include "${uop.name}TypeTraits.h"
+\#include "ConnectionResolver.h"
+\#include "PublisherConnection.h"
+\#include "SubscriberConnection.h"
+\#include "RequesterConnection.h"
+\#include "ResponderConnection.h"
+\#include <memory>
+
+namespace ${uop.name} {
+
+/// Concrete stub implementation of ${uop.name}${integrationContext.name}ConnectionTable.
+///
+/// Generated once per (UoP, IntegrationContext) pair.  Each connection is held
+/// as a std::unique_ptr to the appropriate connection class (PublisherConnection,
+/// SubscriberConnection, RequesterConnection, or ResponderConnection).
+/// Connection instances are null until wired up by the integration layer.
+///
+/// CONSUMER and RESPONDER connections use lazy open/close: Register_Callback is
+/// called on the FACE TS when the first handler is registered, and
+/// Unregister_Callback is called when the last handler is removed.
+///
+/// Transport channel: '${integrationContext.transportChannelName}'
+class ${uop.name}${integrationContext.name}ConnectionTableImpl
+        : public ${uop.name}${integrationContext.name}ConnectionTable {
+public:
+    ${uop.name}${integrationContext.name}ConnectionTableImpl() = default;
+    ~${uop.name}${integrationContext.name}ConnectionTableImpl() override = default;
+
+    /// Wire all connections for this Integration Context.
+    ///
+    /// Must be called once by the integration layer before any send/register
+    /// methods are used.  Connections that cannot be created remain null; their
+    /// send/register methods will return NOT_AVAILABLE / nullptr respectively.
+    ///
+    /// @param resolver  A configured ConnectionResolver for this IC's transport
+    ///                  channel.  Must outlive this ConnectionTableImpl.
+    /// @returns         FACE::RETURN_CODE_TYPE::NO_ERROR always (partial wiring
+    ///                  is allowed; null connections are safely handled at use).
+    FACE::RETURN_CODE_TYPE Initialize(ConnectionResolver& resolver);
+
+    // Non-copyable, non-movable — SubscriberConnection / ResponderConnection
+    // register 'this' with the FACE TS and must not be relocated.
+    ${uop.name}${integrationContext.name}ConnectionTableImpl(const ${uop.name}${integrationContext.name}ConnectionTableImpl&) = delete;
+    ${uop.name}${integrationContext.name}ConnectionTableImpl& operator=(const ${uop.name}${integrationContext.name}ConnectionTableImpl&) = delete;
+    ${uop.name}${integrationContext.name}ConnectionTableImpl(${uop.name}${integrationContext.name}ConnectionTableImpl&&) = delete;
+    ${uop.name}${integrationContext.name}ConnectionTableImpl& operator=(${uop.name}${integrationContext.name}ConnectionTableImpl&&) = delete;
+
+#foreach ($conn in $integrationContext.connections)
+#if ($conn.role.toString() == "PRODUCER")
+    FACE::RETURN_CODE_TYPE send${conn.name}(
+        const ::${model_namespace}::${conn.messageType.name}& msg) override;
+
+#elseif ($conn.role.toString() == "CONSUMER")
+    std::shared_ptr<EventRegistration> register${conn.name}Handler(
+        std::function<void(const ::${model_namespace}::${conn.messageType.name}&)> handler,
+        std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate = {}) override;
+
+#elseif ($conn.role.toString() == "REQUESTER")
+    FACE::RETURN_CODE_TYPE send${conn.name}(
+        const ::${model_namespace}::${conn.messageType.name}& request,
+        std::function<void(const ::${model_namespace}::${conn.responseMessageType.name}&)> responseCallback) override;
+
+#elseif ($conn.role.toString() == "RESPONDER")
+    std::shared_ptr<EventRegistration> register${conn.name}Handler(
+        std::function<void(
+            const ::${model_namespace}::${conn.messageType.name}& request,
+            I${conn.responseMessageType.name}ResponseSender& sender)> handler,
+        std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate = {}) override;
+
+#end
+#end
+private:
+#foreach ($conn in $integrationContext.connections)
+#if ($conn.role.toString() == "PRODUCER")
+    std::unique_ptr<PublisherConnection<::${model_namespace}::${conn.messageType.name}>>
+        m_${conn.name}Connection;
+
+#elseif ($conn.role.toString() == "CONSUMER")
+    std::unique_ptr<SubscriberConnection<::${model_namespace}::${conn.messageType.name}>>
+        m_${conn.name}Connection;
+
+#elseif ($conn.role.toString() == "REQUESTER")
+    std::unique_ptr<RequesterConnection<
+        ::${model_namespace}::${conn.messageType.name},
+        ::${model_namespace}::${conn.responseMessageType.name}>>
+        m_${conn.name}Connection;
+
+#elseif ($conn.role.toString() == "RESPONDER")
+    std::unique_ptr<ResponderConnection<
+        ::${model_namespace}::${conn.messageType.name},
+        ::${model_namespace}::${conn.responseMessageType.name},
+        I${conn.responseMessageType.name}ResponseSender>>
+        m_${conn.name}Connection;
+
+#end
+#end
+};
+
+} // namespace ${uop.name}
+
+#endif // ${guardSymbol}

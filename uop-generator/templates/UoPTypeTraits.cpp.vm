@@ -1,0 +1,31 @@
+##
+## Generated file -- DO NOT EDIT
+## UoP: $uop.name
+## Re-generate using face-codegen with template UoPTypeTraits.cpp.vm
+##
+##
+## Collect unique TssTypeData values by UUID (first-seen order)
+##
+#set ($uniqueTypes = [])
+#set ($seenUuids   = [])
+#foreach ($conn in $uop.connections)
+  #if (!$seenUuids.contains($conn.messageType.uuid))
+    #if ($uniqueTypes.add($conn.messageType))#end
+    #if ($seenUuids.add($conn.messageType.uuid))#end
+  #end
+  #if ($conn.responseMessageType)
+    #if (!$seenUuids.contains($conn.responseMessageType.uuid))
+      #if ($uniqueTypes.add($conn.responseMessageType))#end
+      #if ($seenUuids.add($conn.responseMessageType.uuid))#end
+    #end
+  #end
+#end
+\#include "${uop.name}TypeTraits.h"
+
+#foreach ($type in $uniqueTypes)
+  #if ($type.compositeTemplate)
+DEFINE_FACE_TYPE_TRAITS_COMPOSITE($type.modelNamespace, $type.name)
+  #else
+DEFINE_FACE_TYPE_TRAITS($type.modelNamespace, $type.name)
+  #end
+#end

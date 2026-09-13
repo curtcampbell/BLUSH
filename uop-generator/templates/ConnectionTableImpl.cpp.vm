@@ -1,0 +1,101 @@
+##
+## Generated file -- DO NOT EDIT
+## UoP: $uop.name  /  IntegrationContext: $integrationContext.name
+## Re-generate using face-codegen with template ConnectionTableImpl.cpp.vm
+##
+\#include "${uop.name}${integrationContext.name}ConnectionTableImpl.h"
+
+namespace ${uop.name} {
+
+// ----------------------------------------------------------------------------
+// Initialize — wire all connections via the supplied ConnectionResolver.
+// ----------------------------------------------------------------------------
+FACE::RETURN_CODE_TYPE ${uop.name}${integrationContext.name}ConnectionTableImpl::Initialize(
+    ConnectionResolver& resolver)
+{
+#foreach ($conn in $integrationContext.connections)
+#if ($conn.role.toString() == "PRODUCER")
+    m_${conn.name}Connection =
+        resolver.CreatePubConnection<::${model_namespace}::${conn.messageType.name}>("${conn.name}");
+
+#elseif ($conn.role.toString() == "CONSUMER")
+    m_${conn.name}Connection =
+        resolver.CreateSubConnection<::${model_namespace}::${conn.messageType.name}>("${conn.name}");
+
+#elseif ($conn.role.toString() == "REQUESTER")
+    m_${conn.name}Connection =
+        resolver.CreateReqConnection<
+            ::${model_namespace}::${conn.messageType.name},
+            ::${model_namespace}::${conn.responseMessageType.name}>("${conn.name}");
+
+#elseif ($conn.role.toString() == "RESPONDER")
+    m_${conn.name}Connection =
+        resolver.CreateRspConnection<
+            ::${model_namespace}::${conn.messageType.name},
+            ::${model_namespace}::${conn.responseMessageType.name},
+            I${conn.responseMessageType.name}ResponseSender>("${conn.name}");
+
+#end
+#end
+    // Null connections are handled gracefully at the point of use:
+    // send methods return NOT_AVAILABLE, register methods return nullptr.
+    return FACE::RETURN_CODE_TYPE::NO_ERROR;
+}
+
+#foreach ($conn in $integrationContext.connections)
+#if ($conn.role.toString() == "PRODUCER")
+// ----------------------------------------------------------------------------
+// ${conn.name} -- PRODUCER (outbound pub/sub)
+// TransportChannel: ${integrationContext.transportChannelName}
+// ----------------------------------------------------------------------------
+FACE::RETURN_CODE_TYPE ${uop.name}${integrationContext.name}ConnectionTableImpl::send${conn.name}(
+    const ::${model_namespace}::${conn.messageType.name}& msg)
+{
+    if (!m_${conn.name}Connection) { return FACE::RETURN_CODE_TYPE::NOT_AVAILABLE; }
+    return m_${conn.name}Connection->send(msg);
+}
+
+#elseif ($conn.role.toString() == "CONSUMER")
+// ----------------------------------------------------------------------------
+// ${conn.name} -- CONSUMER (inbound pub/sub)
+// TransportChannel: ${integrationContext.transportChannelName}
+// ----------------------------------------------------------------------------
+std::shared_ptr<EventRegistration> ${uop.name}${integrationContext.name}ConnectionTableImpl::register${conn.name}Handler(
+    std::function<void(const ::${model_namespace}::${conn.messageType.name}&)> handler,
+    std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate)
+{
+    if (!m_${conn.name}Connection) { return nullptr; }
+    return m_${conn.name}Connection->registerHandler(std::move(handler), std::move(predicate));
+}
+
+#elseif ($conn.role.toString() == "REQUESTER")
+// ----------------------------------------------------------------------------
+// ${conn.name} -- REQUESTER (async client/server)
+// TransportChannel: ${integrationContext.transportChannelName}
+// ----------------------------------------------------------------------------
+FACE::RETURN_CODE_TYPE ${uop.name}${integrationContext.name}ConnectionTableImpl::send${conn.name}(
+    const ::${model_namespace}::${conn.messageType.name}& request,
+    std::function<void(const ::${model_namespace}::${conn.responseMessageType.name}&)> responseCallback)
+{
+    if (!m_${conn.name}Connection) { return FACE::RETURN_CODE_TYPE::NOT_AVAILABLE; }
+    return m_${conn.name}Connection->send(request, std::move(responseCallback));
+}
+
+#elseif ($conn.role.toString() == "RESPONDER")
+// ----------------------------------------------------------------------------
+// ${conn.name} -- RESPONDER (async client/server)
+// TransportChannel: ${integrationContext.transportChannelName}
+// ----------------------------------------------------------------------------
+std::shared_ptr<EventRegistration> ${uop.name}${integrationContext.name}ConnectionTableImpl::register${conn.name}Handler(
+    std::function<void(
+        const ::${model_namespace}::${conn.messageType.name}& request,
+        I${conn.responseMessageType.name}ResponseSender& sender)> handler,
+    std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate)
+{
+    if (!m_${conn.name}Connection) { return nullptr; }
+    return m_${conn.name}Connection->registerHandler(std::move(handler), std::move(predicate));
+}
+
+#end
+#end
+} // namespace ${uop.name}

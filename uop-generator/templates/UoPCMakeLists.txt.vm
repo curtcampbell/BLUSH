@@ -1,0 +1,30 @@
+##
+## Generated file -- DO NOT EDIT
+## UoP: $uop.name
+## Re-generate using face-codegen with template UoPCMakeLists.txt.vm
+##
+#set ($myIcs = [])
+#foreach ($ic in $integrationContexts)
+  #if ($ic.uopName == $uop.name)
+    #if ($myIcs.add($ic))#end
+  #end
+#end
+# Auto-generated -- do not edit
+cmake_minimum_required(VERSION 3.16)
+
+add_library(${uop.name}_lib STATIC
+    src/${uop.name}TypeTraits.cpp
+    src/${uop.name}Base.cpp
+#foreach ($ic in $myIcs)
+    src/ConnectionTable/${uop.name}${ic.name}ConnectionTableImpl.cpp
+#end
+)
+
+target_include_directories(${uop.name}_lib
+    PUBLIC  $<BUILD_INTERFACE:\${CMAKE_CURRENT_SOURCE_DIR}/include>
+    PRIVATE $<BUILD_INTERFACE:\${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
+target_link_libraries(${uop.name}_lib
+    PUBLIC face_data_model
+)
