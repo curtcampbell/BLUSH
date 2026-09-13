@@ -35,6 +35,7 @@
 //   // Exclusive write — serialised against all readers and writers:
 //   record.write([](MyRecord& r) { r.value = newValue; });
 
+#include <mutex>
 #include <shared_mutex>
 #include <utility>      // std::forward, std::declval
 

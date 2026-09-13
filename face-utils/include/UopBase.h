@@ -5,6 +5,7 @@
 #include "FACE/Common.hpp"
 #include <map>
 #include <stdexcept>
+#include <string>
 
 /// Base class for FACE UoP implementations.
 ///
@@ -16,7 +17,10 @@
 /// runtime — no synchronization is required for reads after initialisation.
 ///
 /// Outer key: UopBase instance (this)
-/// Inner key: interface_name supplied by the external executive
+/// Inner key: interface_name supplied by the external executive, converted to
+///            std::string for storage — FACE::STRING_TYPE is a fixed binding
+///            of FACE/Common.idl and has no operator<, so it cannot itself be
+///            a std::map key. The public API still takes FACE::STRING_TYPE.
 /// Value:     the injected interface pointer (DataType)
 class UopBase : public virtual FACE::TSS::Base_Injectable::Injectable {
 public:
@@ -39,7 +43,7 @@ public:
         if (outerIt == m_injectionData<DataType>.cend()) {
             return false;
         }
-        return outerIt->second.find(name) != outerIt->second.cend();
+        return outerIt->second.find(name.c_str()) != outerIt->second.cend();
     }
 
     /// Retrieves an injected DataType reference by name.
@@ -51,7 +55,7 @@ public:
         if (outerIt == m_injectionData<DataType>.cend()) {
             throw std::runtime_error("UopBase::GetInjected - no injected entries for requested type");
         }
-        const auto innerIt = outerIt->second.find(name);
+        const auto innerIt = outerIt->second.find(name.c_str());
         if (innerIt == outerIt->second.cend()) {
             throw std::runtime_error("UopBase::GetInjected - no entry for requested name");
         }
@@ -68,15 +72,18 @@ protected:
     /// but is not used as a storage key.
     template<typename DataType>
     void Inject(const FACE::STRING_TYPE& name, DataType injected) {
-        m_injectionData<DataType>[this][name] = injected;
+        m_injectionData<DataType>[this][name.c_str()] = injected;
     }
 
 private:
+    // Keyed on std::string (not FACE::STRING_TYPE) because FACE::STRING_TYPE
+    // has no operator< and cannot be used as a std::map key; it is a fixed
+    // C++ binding of FACE/Common.idl that this project does not own.
     template<typename DataType>
-    static std::map<const UopBase*, std::map<FACE::STRING_TYPE, DataType>> m_injectionData;
+    static std::map<const UopBase*, std::map<std::string, DataType>> m_injectionData;
 };
 
 template<typename DataType>
-std::map<const UopBase*, std::map<FACE::STRING_TYPE, DataType>> UopBase::m_injectionData;
+std::map<const UopBase*, std::map<std::string, DataType>> UopBase::m_injectionData;
 
 #endif //UOPBASE_HPP

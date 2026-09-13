@@ -253,7 +253,7 @@ private:
             return nullptr;
         }
         try {
-            return m_uopBase->GetInjected<FACE::TSS::Base*>(baseName);
+            return m_uopBase->GetInjected<FACE::TSS::Base*>(FACE::STRING_TYPE(baseName.c_str()));
         } catch (...) {
             // TODO: log Base lookup failure for baseName / connectionName
             return nullptr;
@@ -270,7 +270,7 @@ private:
             return nullptr;
         }
         try {
-            return m_uopBase->GetInjected<TypedTS*>(tsName);
+            return m_uopBase->GetInjected<TypedTS*>(FACE::STRING_TYPE(tsName.c_str()));
         } catch (...) {
             // TODO: log TypedTS lookup failure for tsName / connectionName
             return nullptr;
@@ -291,7 +291,7 @@ private:
         FACE::TSS::MESSAGE_SIZE_TYPE  mms = 0;
         FACE::RETURN_CODE_TYPE        rc;
         base->Create_Connection(
-            connectionName,
+            FACE::STRING_TYPE(connectionName),
             FACE::INF_TIME_VALUE,
             id,
             mms,
