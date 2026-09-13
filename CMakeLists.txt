@@ -34,17 +34,23 @@ endif()
 # ---------------------------------------------------------------------------
 # FACE-IDL-Parser tooling (https://github.com/curtcampbell/FACE-IDL-Parser)
 #
-# UoP code that plugs into FACE::Core / FACE::Util (Injectable interfaces,
-# TypedTS connections, uop-connections.xml wiring) is generated with the
-# face-idl-gen / face-codegen CLI tools from that project, driven by the
-# templates in uop-generator/. blush_add_uop_libraries() (cmake/BLUSHUopCodegen.cmake)
-# wraps that pipeline; uop-generator's own CMakeLists.txt uses it as a
-# worked example, and downstream consumers get it via find_package(BLUSH).
+# Both the shared DM/TSS data-model headers and per-UoP glue code are
+# generated with the face-idl-gen / face-codegen CLI tools from that project,
+# driven by templates in data-model/ and uop-generator/ respectively.
+# blush_add_data_model_library() and blush_add_uop_libraries() (cmake/) wrap
+# that pipeline; each subproject's own CMakeLists.txt uses its function as a
+# worked example, and downstream consumers get both via find_package(BLUSH).
 # ---------------------------------------------------------------------------
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BLUSHDataModelCodegen.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BLUSHUopCodegen.cmake")
+
+if(NOT DEFINED BLUSH_DATA_MODEL_TEMPLATE_DIR)
+    set(BLUSH_DATA_MODEL_TEMPLATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data-model/templates")
+endif()
 
 add_subdirectory(face-core)
 add_subdirectory(face-utils)
+add_subdirectory(data-model)
 add_subdirectory(uop-generator)
 
 # ---------------------------------------------------------------------------
@@ -79,11 +85,19 @@ install(
 )
 
 install(
-    FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/BLUSHUopCodegen.cmake"
+    FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/BLUSHFaceCodegenPipeline.cmake"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/BLUSHDataModelCodegen.cmake"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/BLUSHUopCodegen.cmake"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/BLUSH"
 )
 
 install(
     DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/uop-generator/templates/"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/blush/uop-templates"
+)
+
+install(
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/data-model/templates/"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/blush/data-model-templates"
 )

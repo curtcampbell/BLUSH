@@ -14,7 +14,8 @@ application gets to skip the concealer and start from something that already loo
 |---|---|---|
 | [`face-core`](face-core/README.md) | Header-only C++ binding of the FACE 3.2 interfaces (TSS, LCM, IOSS) | `FACE::Core` |
 | [`face-utils`](face-utils/README.md) | UoP support: connection wrappers, injection storage, task scheduling | `FACE::Util` |
-| [`uop-generator`](uop-generator/README.md) | Templates + a CMake function that turn a `.face` model into per-UoP libraries via [FACE-IDL-Parser](https://github.com/curtcampbell/FACE-IDL-Parser) | n/a (provides `blush_add_uop_libraries()`) |
+| [`data-model`](data-model/README.md) | Templates + a CMake function that turn a `.face` model's data types and transport interfaces into a shared library via [FACE-IDL-Parser](https://github.com/curtcampbell/FACE-IDL-Parser) | `face_data_model` (via `blush_add_data_model_library()`) |
+| [`uop-generator`](uop-generator/README.md) | Templates + a CMake function that turn a `.face` model into per-UoP libraries, on top of `data-model` | n/a (provides `blush_add_uop_libraries()`) |
 
 Each subproject's own README covers its API and internals in more depth; this one covers building
 BLUSH and pulling it into another project.
@@ -23,7 +24,7 @@ BLUSH and pulling it into another project.
 
 - CMake 3.16+
 - A C++17 compiler
-- To use `uop-generator`: `face-idl-gen` and `face-codegen` from
+- To use `data-model` or `uop-generator`: `face-idl-gen` and `face-codegen` from
   [FACE-IDL-Parser](https://github.com/curtcampbell/FACE-IDL-Parser) on `PATH`. `face-core` and
   `face-utils` don't need these.
 
@@ -48,13 +49,19 @@ find_package(BLUSH REQUIRED)
 target_link_libraries(your_target PRIVATE FACE::Core)   # FACE interfaces only
 target_link_libraries(your_target PRIVATE FACE::Util)    # + UoP connection/task helpers
 
-# Turn your own .face model into one library per UoP it defines:
+# Turn your own .face model into one library per UoP it defines (this also
+# pulls in the shared FACE::DM / FACE::TSS headers from data-model for you):
 blush_add_uop_libraries(
     FACE_FILE      myapp.face
     OUT_LIBRARIES  MY_UOP_LIBS
 )
 target_link_libraries(your_target PRIVATE ${MY_UOP_LIBS})
+
+# Or, if you just need the data model itself (e.g. a transport service with no UoPs):
+blush_add_data_model_library(FACE_FILE myapp.face)
+target_link_libraries(your_target PRIVATE face_data_model)
 ```
 
-See [`uop-generator/README.md`](uop-generator/README.md) for the full `blush_add_uop_libraries()`
-reference.
+See [`data-model/README.md`](data-model/README.md) and
+[`uop-generator/README.md`](uop-generator/README.md) for the full function references, including
+the config-file (`CONFIG`) alternative to `FACE_FILE`.

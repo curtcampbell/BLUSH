@@ -1,8 +1,10 @@
 @PACKAGE_INIT@
 
 include("${CMAKE_CURRENT_LIST_DIR}/BLUSHTargets.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/BLUSHDataModelCodegen.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/BLUSHUopCodegen.cmake")
 
 set_and_check(BLUSH_UOP_TEMPLATE_DIR "${PACKAGE_PREFIX_DIR}/share/blush/uop-templates")
+set_and_check(BLUSH_DATA_MODEL_TEMPLATE_DIR "${PACKAGE_PREFIX_DIR}/share/blush/data-model-templates")
 
 check_required_components(BLUSH)

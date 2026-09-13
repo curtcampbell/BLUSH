@@ -1,0 +1,4 @@
+generations:
+  - template: ModelNamespace.hpp.vm
+    for_each: MODEL_NAMESPACE
+    output:   "face-model/include/FACE/DM/{model.namespace}/{model.namespace}.hpp"

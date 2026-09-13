@@ -1,0 +1,6 @@
+# Example blush_add_data_model_library() config.
+#
+# Points at the same GROCERY fixture uop-generator's own example uses, rather
+# than duplicating a large XMI file -- see uop-generator/examples/ for the
+# UoP-library side of the same model.
+face_file: ../../uop-generator/examples/GROCERY_with_IM.face

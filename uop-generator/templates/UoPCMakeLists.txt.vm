@@ -26,5 +26,5 @@ target_include_directories(${uop.name}_lib
 )
 
 target_link_libraries(${uop.name}_lib
-    PUBLIC face_data_model
+    PUBLIC face_data_model FACE::Util
 )

@@ -49,9 +49,10 @@ blush_add_uop_libraries(
 )
 ```
 
-Each generated `<UoP>_lib` links `PUBLIC` against a shared `face_data_model` target (defined once
-per directory scope: `FACE::Core` + `FACE::Util` + the generated data-model headers), so you don't
-need to wire that up yourself.
+Each generated `<UoP>_lib` links `PUBLIC` against `face_data_model` (the shared DM/TSS headers —
+see [`data-model`](../data-model/README.md)) and `FACE::Util`. `blush_add_uop_libraries()` ensures
+`face_data_model` exists for `FACE_FILE`, calling `blush_add_data_model_library()` itself if
+nothing else in the project already has, so you don't need to wire that up yourself.
 
 ## Running the bundled example
 
@@ -71,7 +72,7 @@ The example is added with `EXCLUDE_FROM_ALL`, so it does not build as part of a 
 ## How it works
 
 ```
-your.face  ──►  face-idl-gen generate-tss-idl --cpp  ──►  IDL + C++ data-model bindings
+your.face  ──►  face-idl-gen generate-tss-idl --cpp  ──►  IDL + C++ TypedTS bindings
                                                                      │
                 templates/*.vm + codegen.yaml  ──────►  face-codegen generate
                                                                      │
@@ -79,8 +80,12 @@ your.face  ──►  face-idl-gen generate-tss-idl --cpp  ──►  IDL + C++ 
                               <output>/<UoPName>/            (one per UoP, each with
                                   include/, src/,              its own generated
                                   CMakeLists.txt                CMakeLists.txt)
-                              <output>/face-model/include/   (shared data-model headers)
 ```
+
+This is the UoP-specific half of the pipeline; the shared `FACE::DM`/`FACE::TSS` headers every UoP
+includes come from [`data-model`](../data-model/README.md)'s own, separate run of the same two
+tools against the same `.face` file — `blush_add_uop_libraries()` triggers that automatically (see
+above), so you never need to call both functions yourself just to get one UoP library building.
 
 `face-codegen` itself writes a `CMakeLists.txt` into every generated UoP directory (see
 `templates/UoPCMakeLists.txt.vm`), so `blush_add_uop_libraries()` never needs to parse the `.face`
