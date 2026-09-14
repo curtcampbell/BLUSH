@@ -241,11 +241,15 @@ public:
 // Second Standard TypedTS request/response pair, distinct from
 // Request/Response above -- needed only by ConnectionResolver_test.cpp's
 // CreateRspConnection test, which (unlike ResponderConnection_test.cpp)
-// exercises Traits<>-based resolution and therefore can't reuse Request/
-// Response: Traits<Request> already means the combined Extended interface
-// (RequesterConnection's meaning, used by this same test file's
-// CreateReqConnection tests) -- a single C++ type can't carry two Traits<>
-// specializations in one translation unit.
+// exercises Traits<>-based resolution.
+//
+// This predates FaceTypeTraits.h's Role tag parameter: originally Request
+// couldn't carry two Traits<> specializations in one TU (Traits<Request>
+// already meant the combined Extended interface, used by this same file's
+// CreateReqConnection tests via RequesterConnection). Now that the
+// RequesterRole tag exists, Traits<Request, RequesterRole> (Extended) and a
+// bare Traits<Request> (StandardRole) COULD coexist, making this pair
+// removable -- kept for now since nothing requires the cleanup yet.
 // ---------------------------------------------------------------------------
 
 struct RspRequest {
@@ -343,8 +347,14 @@ struct Traits<FaceUtilsTest::Msg> {
     using Read_Callback = FaceUtilsTest::MsgReadCallback;
 };
 
+// RequesterRole, not the bare/default Traits<Request> (StandardRole) -- see
+// FaceTypeTraits.h's StandardRole/RequesterRole doc comment. This is what
+// lets RspRequest/RspResponse below go back to being unnecessary once
+// nothing needs Traits<Request> (bare) for anything else in this TU; kept
+// for now since ResponderConnection_test.cpp/ConnectionResolver_test.cpp's
+// CreateRspConnection test already use the separate Rsp* pair.
 template<>
-struct Traits<FaceUtilsTest::Request> {
+struct Traits<FaceUtilsTest::Request, RequesterRole> {
     using TypedTS       = FaceUtilsTest::ReqRespTypedTS;
     using Read_Callback = FaceUtilsTest::ReqRespReadCallback;
 };

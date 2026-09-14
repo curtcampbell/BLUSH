@@ -23,11 +23,17 @@
 /// Usage:
 ///   RequesterConnection<NavModel::Request, NavModel::Response> conn(ts, connectionId);
 ///   conn.send(request, [](const NavModel::Response& r) { ... });
+///
+/// TypedTS/ReadCallback default from Traits<RequestType, RequesterRole> --
+/// NOT the bare/default Traits<RequestType> (StandardRole) -- since the
+/// combined Extended TypedTS binding is specific to the requester role. See
+/// FaceTypeTraits.h's StandardRole/RequesterRole doc comment and
+/// session-docs/TRAITS-ROLE-CONFLICT.md.
 template<
     typename RequestType,
     typename ResponseType,
-    typename TypedTS      = typename Traits<RequestType>::TypedTS,
-    typename ReadCallback = typename Traits<RequestType>::Read_Callback
+    typename TypedTS      = typename Traits<RequestType, RequesterRole>::TypedTS,
+    typename ReadCallback = typename Traits<RequestType, RequesterRole>::Read_Callback
 >
 class RequesterConnection {
 public:

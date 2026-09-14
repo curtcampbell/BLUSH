@@ -2,9 +2,34 @@
 #define FACETYPETRAITS_H
 
 //////////////////////////////////////////////////////////////////////////////////
-/// Primary trait template — specialised per (model namespace, data type) pair
-/// by DECLARE_FACE_TYPE_TRAITS / DECLARE_FACE_TYPE_TRAITS_DEFAULT below.
-template <typename T>
+/// StandardRole — the default Role tag for Traits<T, Role>. Every DM type has
+/// exactly one Standard TypedTS module (FACE TS 3.2 Appendix E.3.2), and that
+/// binding is what a plain pub/sub connection wants, and what a RESPONDER-role
+/// CLIENT_SERVER connection wants for both its request and response types
+/// (servers never use the Extended interface -- Appendix E.3.2/E.3.3). Those
+/// two cases are therefore the SAME Traits<T> specialisation, keyed on the
+/// bare/default Role, declared once by DECLARE_FACE_TYPE_TRAITS(_COMPOSITE).
+///
+/// RequesterRole — the one case that isn't the default: a REQUESTER-role
+/// CLIENT_SERVER connection's request type binds instead to the COMBINED
+/// Extended TypedTS module (Appendix E.3.3), via
+/// Traits<RequestType, RequesterRole>, declared by
+/// DECLARE_FACE_TYPE_TRAITS_REQRESP(_COMPOSITE). See
+/// session-docs/TRAITS-ROLE-CONFLICT.md for the full design rationale: this
+/// is what lets a REQUESTER UoP and a RESPONDER UoP for the same connection's
+/// request type coexist in one binary -- Traits<T> (bare) and
+/// Traits<T, RequesterRole> are different specialisations of a 2-parameter
+/// template, not competing definitions of the same one.
+struct StandardRole {};
+struct RequesterRole {};
+
+//////////////////////////////////////////////////////////////////////////////////
+/// Primary trait template — specialised per (data type, role) pair by
+/// DECLARE_FACE_TYPE_TRAITS / DECLARE_FACE_TYPE_TRAITS_REQRESP / _DEFAULT
+/// below. Role defaults to StandardRole so every existing bare `Traits<T>`
+/// use (PublisherConnection, SubscriberConnection, ResponderConnection,
+/// FaceInjectable, ...) is unaffected by its presence.
+template <typename T, typename Role = StandardRole>
 struct Traits {};
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -110,20 +135,26 @@ struct Traits {};
 ///   FACE::TSS::<model_ns>::<req_name>_<resp_name>::TypedTS
 ///
 /// keyed by neither name alone (see typed_ts_extended.vtl). RequesterConnection
-/// / ResponderConnection (face-utils) key entirely off the REQUEST type
-/// (Traits<RequestType>::TypedTS / ::Read_Callback), so only the request type
-/// gets a Traits specialisation here -- there is no reverse (TypedTS-keyed)
-/// specialisation and no InjectableInterface, because CLIENT_SERVER
-/// connections are excluded from FaceInjectable<DataType> (UoPBase.h.vm skips
-/// them building its FaceInjectable<...> base-class list) -- CLIENT_SERVER
-/// injection is not yet supported by this framework.
+/// keys entirely off the REQUEST type
+/// (Traits<RequestType, RequesterRole>::TypedTS / ::Read_Callback), so only
+/// the request type gets a Traits specialisation here -- there is no reverse
+/// (TypedTS-keyed) specialisation and no InjectableInterface, because
+/// CLIENT_SERVER connections are excluded from FaceInjectable<DataType>
+/// (UoPBase.h.vm skips them building its FaceInjectable<...> base-class
+/// list) -- CLIENT_SERVER injection is not yet supported by this framework.
+///
+/// Specialises Traits<RequestType, RequesterRole> -- NOT the bare/default
+/// Traits<RequestType> (StandardRole) -- specifically so this coexists with
+/// a RESPONDER-role UoP's ordinary Traits<RequestType> for the very same
+/// request type (see the StandardRole/RequesterRole doc comment above
+/// Traits' primary template, and session-docs/TRAITS-ROLE-CONFLICT.md).
 ///
 /// req_name must be a uop:Template (T_ wrapper); use the _COMPOSITE variant
 /// below when the request is a uop:CompositeTemplate instead.
 ///
 #define DECLARE_FACE_TYPE_TRAITS_REQRESP(model_ns, req_name, resp_name)                             \
     template <>                                                                                     \
-    struct Traits<FACE::DM::model_ns::T_##req_name::req_name> {                                     \
+    struct Traits<FACE::DM::model_ns::T_##req_name::req_name, RequesterRole> {                      \
         typedef FACE::TSS::model_ns::req_name##_##resp_name::TypedTS       TypedTS;                 \
         typedef FACE::TSS::model_ns::req_name##_##resp_name::Read_Callback Read_Callback;            \
         typedef FACE::DM::model_ns::T_##req_name::req_name                 DataType;                \
@@ -138,7 +169,7 @@ struct Traits {};
 ///
 #define DECLARE_FACE_TYPE_TRAITS_REQRESP_COMPOSITE(model_ns, req_name, resp_name)                   \
     template <>                                                                                     \
-    struct Traits<FACE::DM::model_ns::req_name> {                                                   \
+    struct Traits<FACE::DM::model_ns::req_name, RequesterRole> {                                    \
         typedef FACE::TSS::model_ns::req_name##_##resp_name::TypedTS       TypedTS;                 \
         typedef FACE::TSS::model_ns::req_name##_##resp_name::Read_Callback Read_Callback;            \
         typedef FACE::DM::model_ns::req_name                               DataType;                \

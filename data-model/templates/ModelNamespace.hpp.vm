@@ -51,4 +51,16 @@ typedef T_${type.name}::${type.name} ${type.name};
 } // namespace FACE
 #end ## hasAliases
 
+## Pulls in Traits<T> (see FaceTypeTraits.h) for every type in this
+## namespace, so a caller who already includes this convenience header gets
+## Traits<> "for free" without a second explicit #include. This is a
+## deliberate choice, not a technical requirement -- it means
+## FACE::DM::${modelNamespace}::${modelNamespace}.hpp is no longer
+## transport-free (it now transitively pulls in FACE::TSS headers too); see
+## the "design decision" writeup in session-docs/TRAITS-ROLE-CONFLICT.md if
+## that trade-off ever needs revisiting. ${modelNamespace}_Traits.hpp
+## #includes this file too (it needs the DM types declared above), so this
+## is a mutually-guarded include, not a true cycle.
+\#include <FACE/DM/${modelNamespace}/${modelNamespace}_Traits.hpp>
+
 #endif // ${guardSymbol}

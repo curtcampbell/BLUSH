@@ -201,7 +201,9 @@ public:
     CreateReqConnection(const char* connectionName)
     {
         try {
-            using TypedTS = typename Traits<RequestType>::TypedTS;
+            // RequesterRole, not the bare/default Traits<RequestType> --
+            // see FaceTypeTraits.h's StandardRole/RequesterRole doc comment.
+            using TypedTS = typename Traits<RequestType, RequesterRole>::TypedTS;
             TypedTS* ts = getTypedTs<TypedTS>(connectionName);
             if (!ts) { return nullptr; }
             FACE::TSS::CONNECTION_ID_TYPE id = createConnection(connectionName);

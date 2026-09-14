@@ -36,10 +36,11 @@ sample-project/
     src/main.cpp          # constructs + runs all seven UoPs, then exits
 ```
 
-The `integration` executable links six of the seven UoP impl libraries --
-Charlie_Comp is excluded from it; see
-[Why Charlie_Comp isn't in the integration binary](#why-charlie_comp-isnt-in-the-integration-binary)
-below. `Charlie_Comp_impl` still builds normally on its own.
+The `integration` executable links all seven UoP impl libraries, including
+both ends of the one CLIENT_SERVER connection in this model
+(`Beta_Comp`/`Charlie_Comp`) -- see
+[Why Charlie_Comp is back in the integration binary](#why-charlie_comp-is-back-in-the-integration-binary)
+below for why that's worth calling out.
 
 Each `<UoP>Impl` class adds no new lifecycle behavior beyond what the
 generated `<UoP>Base` already implements -- it exists purely to demonstrate
@@ -68,13 +69,13 @@ requires `face-idl-gen` and `face-codegen` on `PATH` (the same tools the
 rest of the BLUSH build depends on) -- `sample-project/CMakeLists.txt`
 skips itself with a `message(STATUS ...)` if they aren't found.
 
-## Why Charlie_Comp isn't in the integration binary
+## Why Charlie_Comp is back in the integration binary
 
 `Beta_Comp` (the REQUESTER/client side) and `Charlie_Comp` (the
 RESPONDER/server side) are the two ends of the same CLIENT_SERVER
 connection, `NewStockAgentRequest` / `NewStockAgentResponse`. Both touch
-the DM type `NewStockAgent_Request`, but each needs a *different*
-`Traits<NewStockAgent_Request>` binding:
+the DM type `NewStockAgent_Request`, but each needs a *different* TypedTS
+binding for it:
 
 - Beta_Comp's requester side needs the combined Extended TypedTS module
   (`Send_Message_Blocking` / `Send_Message_Async`), per FACE TS 3.2
@@ -83,44 +84,38 @@ the DM type `NewStockAgent_Request`, but each needs a *different*
   (`Register_Callback`), per Appendix E.3.2 -- servers never use the
   Extended interface at all.
 
-`Traits<T>` (`face-utils/include/FaceTypeTraits.h`) is keyed globally on
-the bare DM type, with no notion of "which role is asking." That's fine as
-long as a type's requester-side and responder-side UoPs never end up
-linked into the same process -- which matches how FACE deployments
-normally look (each UoP in its own partition), and is true for every UoP
-pair in this sample **except** Beta_Comp/Charlie_Comp. Linking both into
-one binary produces two incompatible specializations of
-`Traits<NewStockAgent_Request>`, which is a hard compile error, not
-something an include guard can paper over (the two definitions genuinely
-disagree, unlike the same-UoP-shared-type case below).
+This sample originally excluded Charlie_Comp from `sample_integration`
+because of this: `Traits<T>` (`face-utils/include/FaceTypeTraits.h`) used
+to be keyed only on the bare DM type, so `Traits<NewStockAgent_Request>`
+could only mean one thing at a time, and Beta_Comp/Charlie_Comp each wanted
+it to mean something different.
 
-Resolving this properly means decoupling `Traits<T>` from the bare DM type
-(e.g. threading an explicit requester/responder tag through
-`ConnectionResolver`, `RequesterConnection`, and `ResponderConnection`
-instead of deriving everything from `Traits<RequestType>`) -- real,
-worthwhile future work, but a face-utils redesign, not a sample-project
-task. For now, Charlie_Comp is built as its own standalone library and
-left out of the combined `sample_integration` executable. Run it on its
-own by writing a one-UoP `main()` against `Charlie_Comp_impl`, following
-the same pattern as `integration/src/main.cpp`.
+That's now fixed by a `Traits<T, Role>` role tag
+(`face-utils/include/FaceTypeTraits.h`; full design writeup in
+`session-docs/TRAITS-ROLE-CONFLICT.md`):
 
-A related but *fixable* problem this sample did fix: several UoPs that
-don't have this requester/responder conflict still legitimately share a
+- `Traits<T>` (bare, defaults to `StandardRole`) is the plain/pub-sub/
+  RESPONDER-side binding -- what Charlie_Comp wants, and now declared
+  exactly once per model in data-model's generated
+  `FACE/DM/<ns>/<ns>_Traits.hpp` (see `data-model/templates/`), pulled in
+  automatically by that namespace's `<ns>.hpp` convenience header.
+- `Traits<T, RequesterRole>` is the combined-Extended binding -- what
+  Beta_Comp wants -- declared by `DECLARE_FACE_TYPE_TRAITS_REQRESP` in
+  Beta_Comp's own generated `Beta_CompTypeTraits.h`.
+
+Since these are two different template instantiations, not two competing
+definitions of the same one, Beta_Comp and Charlie_Comp coexist in one
+binary without conflict. `sample_integration` linking all seven UoPs,
+including both ends of this connection, is the proof.
+
+The same refactor also replaced an earlier, narrower fix: several UoPs that
+don't touch CLIENT_SERVER connections at all still legitimately share a
 plain pub/sub DM type (e.g. `Receipt`, used by `CustomerEngagement`,
-`PointOfSaleTerminal`, and `ReplenishmentService`). Each UoP's generated
-`<UoP>TypeTraits.h` independently declares `Traits<Receipt>` with
-*identical* content, so linking several such UoPs into one binary is safe
-in principle -- but naively, `template<> struct Traits<Receipt>` appearing
-twice in one translation unit is still a hard redefinition error, and the
-out-of-line `Traits<Receipt>::Name` string was a duplicate-symbol error at
-link time. `uop-generator/templates/UoPTypeTraits.h.vm` now wraps each
-`DECLARE_FACE_TYPE_TRAITS` invocation in an include guard keyed on the DM
-type's namespace+name (not the UoP name), and `Name[]`
-(`face-utils/include/FaceTypeTraits.h`) is now a C++17 `constexpr` (inline)
-variable instead of requiring a separate out-of-line `.cpp` definition --
-so identical declarations from different UoPs now coexist correctly. This
-sample's `sample_integration` binary is what exposed the gap; it's a real
-fix to the generator, not a demo-only workaround.
+`PointOfSaleTerminal`, and `ReplenishmentService`). Previously each UoP's
+generated `<UoP>TypeTraits.h` independently redeclared `Traits<Receipt>`
+and needed a same-UoP include guard to avoid a redefinition error when
+linked together; now data-model declares it exactly once and no UoP
+declares it at all, so there's nothing left to guard against.
 
 ## How a real (out-of-tree) project would do this
 

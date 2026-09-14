@@ -16,7 +16,7 @@ application gets to skip the concealer and start from something that already loo
 | [`face-utils`](face-utils/README.md) | UoP support: connection wrappers, injection storage, task scheduling | `FACE::Util` |
 | [`data-model`](data-model/README.md) | Templates + a CMake function that turn a `.face` model's data types and transport interfaces into a shared library via [FACE-IDL-Parser](https://github.com/curtcampbell/FACE-IDL-Parser) | `face_data_model` (via `blush_add_data_model_library()`) |
 | [`uop-generator`](uop-generator/README.md) | Templates + a CMake function that turn a `.face` model into per-UoP libraries, on top of `data-model` | n/a (provides `blush_add_uop_libraries()`) |
-| [`sample-project`](sample-project/README.md) | Worked example: one implementation library per UoP in a sample `.face` model, plus an executable that wires several of them together and runs the FACE lifecycle | `sample_integration` (+ one `<UoP>_impl` per UoP) |
+| [`sample-project`](sample-project/README.md) | Worked example: one implementation library per UoP in a sample `.face` model, plus an executable that wires all of them together and runs the FACE lifecycle | `sample_integration` (+ one `<UoP>_impl` per UoP) |
 
 Each subproject's own README covers its API and internals in more depth; this one covers building
 BLUSH and pulling it into another project. If you want to see the pieces below used together
