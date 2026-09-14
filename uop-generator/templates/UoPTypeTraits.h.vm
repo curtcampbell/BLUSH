@@ -6,14 +6,23 @@
 ##
 ## Collect unique TssTypeData values by UUID (first-seen order)
 ##
-## CLIENT_SERVER (request/response) connections are excluded here: their TSS
+## REQUESTER-role CLIENT_SERVER connections are excluded here: their TSS
 ## transport is a single combined FACE::TSS::<ns>::<reqName>_<respName>::TypedTS
 ## module (see face-idl-gen's typed_ts_extended.vtl), not one TypedTS per
 ## individual message type -- so DECLARE_FACE_TYPE_TRAITS's 1:1
 ## type<->TypedTS-module assumption (FaceTypeTraits.h) does not hold for
-## either the request or the response type. Mirrors the same guard in
-## UoPBase.h.vm. Traits for CLIENT_SERVER request/response types are a
-## face-utils gap, not something this template can paper over.
+## either the request or the response type; see $reqRespPairs below instead.
+## Mirrors the guard in UoPBase.h.vm.
+##
+## RESPONDER-role CLIENT_SERVER connections are the OPPOSITE: FACE TS 3.2
+## Appendix E.3.2/E.3.3 -- the server side does NOT use the Extended
+## interface at all ("Servers ... do not use Send_Message_Async(TS)"). It
+## uses two ordinary Standard TypedTS modules instead (one for the request
+## type, receive; one for the response type, send -- see
+## typed_ts_responder_request.vtl / typed_ts_responder_response.vtl), which
+## are structurally identical to any pub/sub type's module -- so both types
+## get the SAME ordinary DECLARE_FACE_TYPE_TRAITS(_COMPOSITE) treatment as
+## $uniqueTypes below, just added into this same list.
 #set ($uniqueTypes = [])
 #set ($seenUuids   = [])
 #foreach ($conn in $uop.connections)
@@ -22,6 +31,15 @@
       #if ($uniqueTypes.add($conn.messageType))#end
       #if ($seenUuids.add($conn.messageType.uuid))#end
     #end
+  #elseif ($conn.role.name() == "RESPONDER")
+    #if (!$seenUuids.contains($conn.messageType.uuid))
+      #if ($uniqueTypes.add($conn.messageType))#end
+      #if ($seenUuids.add($conn.messageType.uuid))#end
+    #end
+    #if (!$seenUuids.contains($conn.responseMessageType.uuid))
+      #if ($uniqueTypes.add($conn.responseMessageType))#end
+      #if ($seenUuids.add($conn.responseMessageType.uuid))#end
+    #end
   #end
 #end
 ##
@@ -29,14 +47,14 @@
 ##
 #set ($guardSymbol = "${uop.name.toUpperCase()}_TYPE_TRAITS_H")
 ##
-## CLIENT_SERVER connections: collect (request, response) pairs. Deduped by
-## request UUID -- RequesterConnection/ResponderConnection (face-utils) key
+## REQUESTER-role CLIENT_SERVER connections: collect (request, response)
+## pairs. Deduped by request UUID -- RequesterConnection (face-utils) keys
 ## entirely off the request type, so that's the natural dedup key.
 ##
 #set ($reqRespPairs = [])
 #set ($seenReqUuids = [])
 #foreach ($conn in $uop.connections)
-  #if ($conn.kind.name() == "CLIENT_SERVER")
+  #if ($conn.kind.name() == "CLIENT_SERVER" && $conn.role.name() == "REQUESTER")
     #if (!$seenReqUuids.contains($conn.messageType.uuid))
       #if ($reqRespPairs.add($conn))#end
       #if ($seenReqUuids.add($conn.messageType.uuid))#end
@@ -88,19 +106,42 @@
 ## C-style statement macro) -- omitting it here previously went unnoticed
 ## because compilation always failed earlier, upstream at the
 ## TypedTS_Injectable gap this fixed.
+##
+## Each invocation below is wrapped in an include guard keyed on the DM
+## type's namespace+name (never the UoP name) rather than relying solely on
+## this file's own top-level $guardSymbol. A DM type shared by two UoPs
+## (e.g. a pub/sub message both publish/subscribe) gets this same
+## DECLARE_FACE_TYPE_TRAITS invoked once per UoP's <UoP>TypeTraits.h; if an
+## application links more than one such UoP into a single binary and some
+## translation unit includes both headers, the second `template<> struct
+## Traits<...>` would otherwise be a hard redefinition error even though
+## the two invocations are textually identical. This guard makes the
+## second occurrence a no-op. It does NOT paper over a *conflicting*
+## redeclaration (e.g. the same type appearing once via this plain form and
+## once via DECLARE_FACE_TYPE_TRAITS_REQRESP with a different TypedTS) --
+## that is a genuine incompatibility between the two UoPs' roles for that
+## type and linking them together is not supported.
 #foreach ($type in $uniqueTypes)
+#set ($typeGuard = "FACE_TRAITS_DECLARED_${type.modelNamespace.toUpperCase()}_${type.name.toUpperCase()}")
+#ifndef ${typeGuard}
+\#define ${typeGuard}
   #if ($type.compositeTemplate)
 DECLARE_FACE_TYPE_TRAITS_COMPOSITE($type.modelNamespace, $type.name);
   #else
 DECLARE_FACE_TYPE_TRAITS($type.modelNamespace, $type.name);
   #end
+#endif // ${typeGuard}
 #end
 #foreach ($conn in $reqRespPairs)
+#set ($reqGuard = "FACE_TRAITS_REQRESP_DECLARED_${conn.messageType.modelNamespace.toUpperCase()}_${conn.messageType.name.toUpperCase()}")
+#ifndef ${reqGuard}
+\#define ${reqGuard}
   #if ($conn.messageType.compositeTemplate)
 DECLARE_FACE_TYPE_TRAITS_REQRESP_COMPOSITE($conn.messageType.modelNamespace, $conn.messageType.name, $conn.responseMessageType.name);
   #else
 DECLARE_FACE_TYPE_TRAITS_REQRESP($conn.messageType.modelNamespace, $conn.messageType.name, $conn.responseMessageType.name);
   #end
+#endif // ${reqGuard}
 #end
 
 #endif // ${guardSymbol}

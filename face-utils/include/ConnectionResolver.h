@@ -107,12 +107,16 @@ public:
                      conn != nullptr;
                      conn = conn->NextSiblingElement("connection"))
                 {
-                    const char* connName = conn->Attribute("name");
-                    const char* base     = conn->Attribute("base");
-                    const char* typedTs  = conn->Attribute("typed_ts");
+                    const char* connName  = conn->Attribute("name");
+                    const char* base      = conn->Attribute("base");
+                    const char* typedTs   = conn->Attribute("typed_ts");
+                    // RESPONDER-role connections inject TWO TypedTS pointers
+                    // (request-receive, response-send) -- see CreateRspConnection.
+                    const char* typedTsRsp = conn->Attribute("typed_ts_response");
                     if (!connName) { continue; }  // TODO: log malformed entry
-                    if (base)    { m_perConnectionBase[connName]  = base; }
-                    if (typedTs) { m_perConnectionNames[connName] = typedTs; }
+                    if (base)      { m_perConnectionBase[connName]          = base; }
+                    if (typedTs)   { m_perConnectionNames[connName]         = typedTs; }
+                    if (typedTsRsp){ m_perConnectionResponseNames[connName] = typedTsRsp; }
                 }
             }
             return;
@@ -140,6 +144,15 @@ public:
     void setConnectionTypedTsName(const std::string& connectionName,
                                   const std::string& typedTsName) {
         m_perConnectionNames[connectionName] = typedTsName;
+    }
+
+    /// Override the RESPONSE-side TypedTS instance name for one specific
+    /// RESPONDER connection (see CreateRspConnection).  No uniform-mode
+    /// equivalent: each responder connection's response type differs, so a
+    /// single shared name is not meaningful the way it is for typed_ts.
+    void setConnectionTypedTsResponseName(const std::string& connectionName,
+                                          const std::string& typedTsName) {
+        m_perConnectionResponseNames[connectionName] = typedTsName;
     }
 
     // -------------------------------------------------------------------------
@@ -201,18 +214,29 @@ public:
         }
     }
 
+    /// FACE TS 3.2 Appendix E.3.2/E.3.3: the responder side uses two
+    /// ordinary Standard TypedTS connections (request-receive,
+    /// response-send), not the combined Extended interface -- so this
+    /// resolves TWO injected TypedTS pointers under two separately
+    /// configured names (typed_ts / typed_ts_response) but a single shared
+    /// CONNECTION_ID_TYPE, matching FACE TS 3.2 §E.3/RIG Vol 2 §6.4.2.2's
+    /// single-connection-id CLIENT_SERVER model.
     template<typename RequestType, typename ResponseType, typename ISender>
     std::unique_ptr<ResponderConnection<RequestType, ResponseType, ISender>>
     CreateRspConnection(const char* connectionName)
     {
         try {
-            using TypedTS = typename Traits<RequestType>::TypedTS;
-            TypedTS* ts = getTypedTs<TypedTS>(connectionName);
-            if (!ts) { return nullptr; }
+            using RequestTypedTS  = typename Traits<RequestType>::TypedTS;
+            using ResponseTypedTS = typename Traits<ResponseType>::TypedTS;
+            RequestTypedTS* requestTs = getTypedTs<RequestTypedTS>(connectionName);
+            if (!requestTs) { return nullptr; }
+            ResponseTypedTS* responseTs = getTypedTsResponse<ResponseTypedTS>(connectionName);
+            if (!responseTs) { return nullptr; }
             FACE::TSS::CONNECTION_ID_TYPE id = createConnection(connectionName);
             if (id < 0) { return nullptr; }
             return std::unique_ptr<ResponderConnection<RequestType, ResponseType, ISender>>(
-                new ResponderConnection<RequestType, ResponseType, ISender>(ts, id));
+                new ResponderConnection<RequestType, ResponseType, ISender>(
+                    requestTs, responseTs, id));
         } catch (...) {
             // TODO: log failure for connectionName
             return nullptr;
@@ -238,6 +262,15 @@ private:
         auto it = m_perConnectionNames.find(connectionName);
         if (it != m_perConnectionNames.end()) { return it->second; }
         return m_uniformTypedTsName;
+    }
+
+    /// Return the RESPONSE-side TypedTS instance name for the given
+    /// RESPONDER connection.  No uniform-mode fallback (see
+    /// setConnectionTypedTsResponseName); returns an empty string if unset.
+    const std::string& resolveTypedTsResponseName(const char* connectionName) const {
+        static const std::string empty;
+        auto it = m_perConnectionResponseNames.find(connectionName);
+        return it != m_perConnectionResponseNames.end() ? it->second : empty;
     }
 
     // -------------------------------------------------------------------------
@@ -273,6 +306,24 @@ private:
             return m_uopBase->GetInjected<TypedTS*>(FACE::STRING_TYPE(tsName.c_str()));
         } catch (...) {
             // TODO: log TypedTS lookup failure for tsName / connectionName
+            return nullptr;
+        }
+    }
+
+    /// Retrieve the injected RESPONSE-side TypedTS* for a RESPONDER
+    /// connection (see resolveTypedTsResponseName). Returns nullptr if the
+    /// name is unset/empty or the pointer is not injected.
+    template<typename TypedTS>
+    TypedTS* getTypedTsResponse(const char* connectionName) {
+        const std::string& tsName = resolveTypedTsResponseName(connectionName);
+        if (tsName.empty()) {
+            // TODO: log missing response TypedTS name for connectionName
+            return nullptr;
+        }
+        try {
+            return m_uopBase->GetInjected<TypedTS*>(FACE::STRING_TYPE(tsName.c_str()));
+        } catch (...) {
+            // TODO: log response TypedTS lookup failure for tsName / connectionName
             return nullptr;
         }
     }
@@ -314,6 +365,7 @@ private:
 
     std::map<std::string, std::string> m_perConnectionBase;
     std::map<std::string, std::string> m_perConnectionNames;
+    std::map<std::string, std::string> m_perConnectionResponseNames;
 };
 
 #endif // CONNECTIONRESOLVER_H

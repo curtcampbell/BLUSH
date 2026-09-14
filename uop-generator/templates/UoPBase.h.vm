@@ -3,6 +3,14 @@
 ## UoP: $uop.name
 ## Re-generate using face-codegen with template UoPBase.h.vm
 ##
+## REQUESTER-role CLIENT_SERVER connections are excluded: RequesterConnection
+## has no FaceInjectable<> support today (the combined Extended TypedTS isn't
+## wired into the injection mechanism). RESPONDER-role connections ARE
+## included: FACE TS 3.2 Appendix E.3.2/E.3.3 means the responder's request
+## and response types each get an ordinary Standard TypedTS module (see
+## UoPTypeTraits.h.vm's matching comment), so they're injectable exactly like
+## any pub/sub type -- ConnectionResolver::CreateRspConnection needs both
+## injected.
 #set ($uniqueTypes = [])
 #set ($seenUuids   = [])
 #foreach ($conn in $uop.connections)
@@ -10,6 +18,15 @@
     #if (!$seenUuids.contains($conn.messageType.uuid))
       #if ($uniqueTypes.add($conn.messageType))#end
       #if ($seenUuids.add($conn.messageType.uuid))#end
+    #end
+  #elseif ($conn.role.name() == "RESPONDER")
+    #if (!$seenUuids.contains($conn.messageType.uuid))
+      #if ($uniqueTypes.add($conn.messageType))#end
+      #if ($seenUuids.add($conn.messageType.uuid))#end
+    #end
+    #if (!$seenUuids.contains($conn.responseMessageType.uuid))
+      #if ($uniqueTypes.add($conn.responseMessageType))#end
+      #if ($seenUuids.add($conn.responseMessageType.uuid))#end
     #end
   #end
 #end

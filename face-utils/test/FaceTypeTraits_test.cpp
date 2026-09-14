@@ -20,7 +20,6 @@ class Injectable {};
 }}}}
 
 DECLARE_FACE_TYPE_TRAITS(TraitsTestModel, Widget);
-DEFINE_FACE_TYPE_TRAITS(TraitsTestModel, Widget);
 
 // --- uop:CompositeTemplate shape (no T_ wrapper) ---------------------------
 namespace FACE { namespace DM { namespace TraitsTestModel {
@@ -36,7 +35,6 @@ class Injectable {};
 }}}}
 
 DECLARE_FACE_TYPE_TRAITS_COMPOSITE(TraitsTestModel, Gadget);
-DEFINE_FACE_TYPE_TRAITS_COMPOSITE(TraitsTestModel, Gadget);
 
 // --- DEFAULT_NAMESPACE convenience macros (resolve to UVC, uop:Template) --
 namespace FACE { namespace DM { namespace UVC { namespace T_Sprocket {
@@ -52,7 +50,6 @@ class Injectable {};
 }}}}
 
 DECLARE_FACE_TYPE_TRAITS_DEFAULT(Sprocket);
-DEFINE_FACE_TYPE_TRAITS_DEFAULT(Sprocket);
 
 namespace {
 

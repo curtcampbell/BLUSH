@@ -11,14 +11,30 @@
 
 /// ResponderConnection<RequestType, ResponseType, IResponseSenderBase>
 ///
-/// Wraps a FACE CLIENT_SERVER connection for receiving requests and sending
-/// responses.  Inherits from ReadCallback to serve as the registered FACE
-/// callback on the connection.
+/// Wraps the server/responder side of a FACE CLIENT_SERVER connection for
+/// receiving requests and sending responses.  Inherits from
+/// RequestReadCallback to serve as the registered FACE callback for the
+/// request side.
 ///
-/// A CLIENT_SERVER connection is bi-directional on a single connection ID
-/// (FACE Technical Standard §E.3, RIG Vol 2 §6.4.2.2).  One Create_Connection
-/// call yields one CONNECTION_ID_TYPE used for both Register_Callback (inbound
-/// requests) and Send_Message (outbound responses).
+/// FACE Technical Standard 3.2 Appendix E.3.2/E.3.3: unlike the client side
+/// (RequesterConnection, which uses the Extended TypedTS's
+/// Send_Message_Blocking/Send_Message_Async), the server side does NOT use
+/// the Extended interface at all -- "Servers, publishers and subscribers do
+/// not use Send_Message_Async(TS)". Instead the server uses two ordinary
+/// Standard TypedTS connections:
+///   - one instantiated with the REQUEST type, to receive requests exactly
+///     like a pub/sub subscriber (Register_Callback/Callback_Handler), which
+///     hands back a transaction_id ("Servers ... are returned a valid
+///     transaction_id from the Receive_Message(TS) call");
+///   - one instantiated with the RESPONSE type, to send the reply exactly
+///     like a pub/sub publisher (Send_Message), passing that SAME
+///     transaction_id back ("When sending a server's response, the TSS
+///     implementation uses the transaction_id provided by the caller").
+///
+/// The two TypedTS connections still share a single CONNECTION_ID_TYPE (FACE
+/// Technical Standard §E.3, RIG Vol 2 §6.4.2.2): one Create_Connection call
+/// yields one id used for both Register_Callback (inbound requests) and
+/// Send_Message (outbound responses).
 ///
 /// For each incoming request, a stack-allocated ResponseSenderImpl is
 /// constructed and passed alongside the request to all registered handlers.
@@ -39,14 +55,16 @@
 ///   ResponseType        — the FACE response data model type
 ///   IResponseSenderBase — generated I{TypeName}ResponseSender interface;
 ///                         must declare sendResponse(const ResponseType&)
-///   TypedTS             — Extended TypedTS for this request/reply pair
+///   RequestTypedTS      — Standard TypedTS for the request type (receive)
 ///                         (default: from Traits<RequestType>)
-///   ReadCallback        — request-side callback base class
+///   RequestReadCallback — request-side callback base class
 ///                         (default: from Traits<RequestType>)
+///   ResponseTypedTS     — Standard TypedTS for the response type (send)
+///                         (default: from Traits<ResponseType>)
 ///
 /// Usage:
 ///   ResponderConnection<NavModel::Request, NavModel::Response, IMyResponseSender>
-///       conn(ts, connectionId);
+///       conn(requestTs, responseTs, connectionId);
 ///
 ///   auto reg = conn.registerHandler(
 ///       [](const NavModel::Request& req, IMyResponseSender& sender) {
@@ -56,21 +74,26 @@ template<
     typename RequestType,
     typename ResponseType,
     typename IResponseSenderBase,
-    typename TypedTS      = typename Traits<RequestType>::TypedTS,
-    typename ReadCallback = typename Traits<RequestType>::Read_Callback
+    typename RequestTypedTS      = typename Traits<RequestType>::TypedTS,
+    typename RequestReadCallback = typename Traits<RequestType>::Read_Callback,
+    typename ResponseTypedTS     = typename Traits<ResponseType>::TypedTS
 >
-class ResponderConnection : public ReadCallback {
+class ResponderConnection : public RequestReadCallback {
 public:
     using HandlerFn   = std::function<void(const RequestType&, IResponseSenderBase&)>;
     using PredicateFn = std::function<bool(const RequestType&)>;
 
-    /// @param ts            Extended TypedTS for this CLIENT_SERVER connection.
+    /// @param requestTs     Standard TypedTS for the request type (receive side).
+    /// @param responseTs    Standard TypedTS for the response type (send side).
     /// @param connectionId  The single connection ID returned by Base::Create_Connection.
-    ///                      Used for both Register_Callback and Send_Message (response).
+    ///                      Used for both Register_Callback (on requestTs) and
+    ///                      Send_Message (on responseTs).
     ResponderConnection(
-        TypedTS*                       ts,
+        RequestTypedTS*                requestTs,
+        ResponseTypedTS*               responseTs,
         FACE::TSS::CONNECTION_ID_TYPE  connectionId)
-        : m_ts(ts)
+        : m_requestTs(requestTs)
+        , m_responseTs(responseTs)
         , m_connectionId(connectionId)
         , m_handlerCount(0)
     {}
@@ -78,7 +101,7 @@ public:
     ~ResponderConnection() {
         if (m_handlerCount > 0) {
             FACE::RETURN_CODE_TYPE rc;
-            m_ts->Unregister_Callback(m_connectionId, rc);
+            m_requestTs->Unregister_Callback(m_connectionId, rc);
         }
     }
 
@@ -112,8 +135,15 @@ public:
         auto reg = m_dispatcher.Register(std::move(wrapped));
 
         if (m_handlerCount == 0) {
+            // Register_Callback's callback parameter is "inout Read_Callback"
+            // where Read_Callback is a LOCAL interface (declared alongside
+            // TypedTS in the same Typed<DATATYPE_TYPE> template body) --
+            // FACE TS 3.2's C++ mapping for that shape is
+            // RequestReadCallback**, not a reference (confirmed against real
+            // generated TypedTS.hpp; same fix as SubscriberConnection).
             FACE::RETURN_CODE_TYPE rc;
-            m_ts->Register_Callback(m_connectionId, *this, rc);
+            RequestReadCallback* selfPtr = this;
+            m_requestTs->Register_Callback(m_connectionId, &selfPtr, rc);
         }
         ++m_handlerCount;
 
@@ -134,7 +164,7 @@ public:
                     --(m_owner->m_handlerCount);
                     if (m_owner->m_handlerCount == 0) {
                         FACE::RETURN_CODE_TYPE rc;
-                        m_owner->m_ts->Unregister_Callback(
+                        m_owner->m_requestTs->Unregister_Callback(
                             m_owner->m_connectionId, rc);
                     }
                 }
@@ -144,7 +174,7 @@ public:
         return std::make_shared<HandlerRegistration>(std::move(reg), this);
     }
 
-    // --- FACE ReadCallback implementation ---
+    // --- FACE RequestReadCallback implementation ---
     void Callback_Handler(
         FACE::TSS::CONNECTION_ID_TYPE    connection_id,
         FACE::TSS::TRANSACTION_ID_TYPE   transaction_id,
@@ -159,18 +189,18 @@ public:
 
         // The transaction_id from the inbound request is used to correlate
         // the outbound response on the same connection ID.
-        ResponseSenderImpl sender(m_ts, m_connectionId, transaction_id);
+        ResponseSenderImpl sender(m_responseTs, m_connectionId, transaction_id);
         m_dispatcher(message, sender);
         return_code = FACE::RETURN_CODE_TYPE::NO_ERROR;
     }
 
 private:
     /// Stack-allocated response sender created per incoming request.
-    /// Wraps the same TypedTS and connection ID; uses the inbound transaction_id
-    /// to correlate request and response on the CLIENT_SERVER connection.
+    /// Wraps the response TypedTS and connection ID; uses the inbound
+    /// transaction_id to correlate request and response.
     struct ResponseSenderImpl : public IResponseSenderBase {
         ResponseSenderImpl(
-            TypedTS*                       ts,
+            ResponseTypedTS*               ts,
             FACE::TSS::CONNECTION_ID_TYPE  connectionId,
             FACE::TSS::TRANSACTION_ID_TYPE transactionId)
             : m_ts(ts)
@@ -188,15 +218,16 @@ private:
                 rc);
         }
 
-        TypedTS*                       m_ts;
+        ResponseTypedTS*               m_ts;
         FACE::TSS::CONNECTION_ID_TYPE  m_connectionId;
         FACE::TSS::TRANSACTION_ID_TYPE m_transactionId;
     };
 
-    TypedTS*                       m_ts;
-    FACE::TSS::CONNECTION_ID_TYPE  m_connectionId;
+    RequestTypedTS*                 m_requestTs;
+    ResponseTypedTS*                m_responseTs;
+    FACE::TSS::CONNECTION_ID_TYPE   m_connectionId;
     EventDispatcher<const RequestType&, IResponseSenderBase&> m_dispatcher;
-    int                            m_handlerCount;
+    int                             m_handlerCount;
 };
 
 #endif // RESPONDERCONNECTION_H

@@ -4,12 +4,17 @@
 #include <gtest/gtest.h>
 
 using FaceUtilsTest::IResponseSender;
+using FaceUtilsTest::IRspResponseSender;
 using FaceUtilsTest::MockBase;
 using FaceUtilsTest::MockMsgTypedTS;
 using FaceUtilsTest::MockReqRespTypedTS;
+using FaceUtilsTest::MockRspRequestTypedTS;
+using FaceUtilsTest::MockRspResponseTypedTS;
 using FaceUtilsTest::Msg;
 using FaceUtilsTest::Request;
 using FaceUtilsTest::Response;
+using FaceUtilsTest::RspRequest;
+using FaceUtilsTest::RspResponse;
 using ::testing::_;
 using ::testing::Invoke;
 using ::testing::NiceMock;
@@ -326,37 +331,42 @@ TEST(ConnectionResolverTest, CreateReqConnectionFailsWhenBaseMissing) {
 TEST(ConnectionResolverTest, CreateRspConnectionSucceedsEndToEnd) {
     InjectableUopBase uop;
     NiceMock<MockBase> base;
-    NiceMock<MockReqRespTypedTS> ts;
+    NiceMock<MockRspRequestTypedTS>  requestTs;
+    NiceMock<MockRspResponseTypedTS> responseTs;
     ExpectCreateConnectionSucceeds(base, 6);
     uop.Inject<FACE::TSS::Base*>(FACE::STRING_TYPE("base"), &base);
-    uop.Inject<FaceUtilsTest::ReqRespTypedTS*>(FACE::STRING_TYPE("ts"), &ts);
+    uop.Inject<FaceUtilsTest::RspRequestTypedTS*>(FACE::STRING_TYPE("reqTs"), &requestTs);
+    uop.Inject<FaceUtilsTest::RspResponseTypedTS*>(FACE::STRING_TYPE("respTs"), &responseTs);
 
     ConnectionResolver resolver(&uop);
     resolver.setUniformBaseName("base");
-    resolver.setUniformTypedTsName("ts");
+    // No uniform-mode fallback for the response name (see
+    // resolveTypedTsResponseName); per-connection setters for both.
+    resolver.setConnectionTypedTsName("myConn", "reqTs");
+    resolver.setConnectionTypedTsResponseName("myConn", "respTs");
 
-    EXPECT_CALL(ts, Register_Callback(6, _, _)).Times(1);
+    EXPECT_CALL(requestTs, Register_Callback(6, _, _)).Times(1);
 
-    auto conn = resolver.CreateRspConnection<Request, Response, IResponseSender>("myConn");
+    auto conn = resolver.CreateRspConnection<RspRequest, RspResponse, IRspResponseSender>("myConn");
     ASSERT_NE(conn, nullptr);
 
-    Response capturedResponse{};
-    EXPECT_CALL(ts, Send_Message(6, _, _, _, _))
+    RspResponse capturedResponse{};
+    EXPECT_CALL(responseTs, Send_Message(6, _, _, _, _))
         .WillOnce(Invoke([&](FACE::TSS::CONNECTION_ID_TYPE, FACE::TIMEOUT_TYPE,
-                              FACE::TSS::TRANSACTION_ID_TYPE&, const Response& resp,
+                              FACE::TSS::TRANSACTION_ID_TYPE&, const RspResponse& resp,
                               FACE::RETURN_CODE_TYPE& rc) {
             capturedResponse = resp;
             rc = FACE::RETURN_CODE_TYPE::NO_ERROR;
         }));
 
-    conn->registerHandler([](const Request& req, IResponseSender& sender) {
-        sender.sendResponse(Response{req.value + 1});
+    conn->registerHandler([](const RspRequest& req, IRspResponseSender& sender) {
+        sender.sendResponse(RspResponse{req.value + 1});
     });
 
     FACE::TSS::HEADER_TYPE    header{};
     FACE::TSS::QoS_EVENT_TYPE qos{};
     FACE::RETURN_CODE_TYPE    rc;
-    conn->Callback_Handler(6, 9, Request{41}, header, qos, rc);
+    conn->Callback_Handler(6, 9, RspRequest{41}, header, qos, rc);
 
     EXPECT_EQ(capturedResponse.value, 42);
 }
@@ -364,9 +374,11 @@ TEST(ConnectionResolverTest, CreateRspConnectionSucceedsEndToEnd) {
 TEST(ConnectionResolverTest, CreateRspConnectionFailsWhenCreateConnectionErrors) {
     InjectableUopBase uop;
     NiceMock<MockBase> base;
-    NiceMock<MockReqRespTypedTS> ts;
+    NiceMock<MockRspRequestTypedTS>  requestTs;
+    NiceMock<MockRspResponseTypedTS> responseTs;
     uop.Inject<FACE::TSS::Base*>(FACE::STRING_TYPE("base"), &base);
-    uop.Inject<FaceUtilsTest::ReqRespTypedTS*>(FACE::STRING_TYPE("ts"), &ts);
+    uop.Inject<FaceUtilsTest::RspRequestTypedTS*>(FACE::STRING_TYPE("reqTs"), &requestTs);
+    uop.Inject<FaceUtilsTest::RspResponseTypedTS*>(FACE::STRING_TYPE("respTs"), &responseTs);
 
     ON_CALL(base, Create_Connection(_, _, _, _, _))
         .WillByDefault(Invoke([](const FACE::TSS::CONNECTION_NAME_TYPE&, FACE::TIMEOUT_TYPE,
@@ -377,8 +389,9 @@ TEST(ConnectionResolverTest, CreateRspConnectionFailsWhenCreateConnectionErrors)
 
     ConnectionResolver resolver(&uop);
     resolver.setUniformBaseName("base");
-    resolver.setUniformTypedTsName("ts");
+    resolver.setConnectionTypedTsName("myConn", "reqTs");
+    resolver.setConnectionTypedTsResponseName("myConn", "respTs");
 
-    EXPECT_EQ((resolver.CreateRspConnection<Request, Response, IResponseSender>("myConn")),
+    EXPECT_EQ((resolver.CreateRspConnection<RspRequest, RspResponse, IRspResponseSender>("myConn")),
               nullptr);
 }

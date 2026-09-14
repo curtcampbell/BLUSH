@@ -37,11 +37,22 @@
         </xs:sequence>
     </xs:complexType>
 
-    <!-- A single named connection -->
+    <!--
+        A single named connection.
+
+        typed_ts_response is optional and used only for RESPONDER-role
+        CLIENT_SERVER connections (ConnectionResolver::CreateRspConnection):
+        FACE TS 3.2 Appendix E.3.2/E.3.3 has the responder side use two
+        ordinary Standard TypedTS connections rather than the combined
+        Extended interface -- typed_ts names the request-receive side (as for
+        any other connection), typed_ts_response names the response-send
+        side.
+    -->
     <xs:complexType name="connection-type">
-        <xs:attribute name="name"     type="xs:string" use="required"/>
-        <xs:attribute name="base"     type="xs:string" use="required"/>
-        <xs:attribute name="typed_ts" type="xs:string" use="required"/>
+        <xs:attribute name="name"              type="xs:string" use="required"/>
+        <xs:attribute name="base"              type="xs:string" use="required"/>
+        <xs:attribute name="typed_ts"          type="xs:string" use="required"/>
+        <xs:attribute name="typed_ts_response" type="xs:string" use="optional"/>
     </xs:complexType>
 
     <!-- all-connections applies the same base/typed_ts to every connection -->

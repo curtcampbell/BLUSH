@@ -37,7 +37,7 @@ struct Traits {};
 ///                              argument is Traits<DataType>::InjectableInterface,
 ///                              where DataType is THIS (DM-keyed) specialisation,
 ///                              not the TypedTS-keyed one)
-///        Name[]              — runtime string name (defined by DEFINE_FACE_TYPE_TRAITS)
+///        Name[]              — runtime string name
 ///
 ///   2. Traits<FACE::TSS::model_ns::data_type_name::TypedTS>
 ///        DataType            — back-reference to the data model type
@@ -46,7 +46,14 @@ struct Traits {};
 /// model_ns must be the single namespace token that appears in both
 /// FACE::DM::<model_ns> and FACE::TSS::<model_ns>
 /// (e.g. CheckoutGateway_Templates, CORE_Templates).
-/// Place the DECLARE macro in a header; the paired DEFINE macro in one .cpp.
+///
+/// Name[] is declared `static constexpr` (a C++17 inline variable), not
+/// `static const` with a separate out-of-line definition: a DM type shared
+/// by two UoPs gets this same DECLARE macro invoked once per UoP, and if
+/// both UoPs' generated headers ever land in one translation unit (e.g. an
+/// executable linking more than one UoP), identical inline definitions are
+/// legal under the ODR where two out-of-line `.cpp` definitions would be a
+/// duplicate-symbol link error. There is no paired DEFINE macro to call.
 ///
 #define DECLARE_FACE_TYPE_TRAITS(model_ns, data_type_name)                                          \
     template <>                                                                                     \
@@ -55,7 +62,7 @@ struct Traits {};
         typedef FACE::TSS::model_ns::data_type_name::Read_Callback Read_Callback;                   \
         typedef FACE::DM::model_ns::T_##data_type_name::data_type_name DataType;                    \
         typedef FACE::TSS::model_ns::data_type_name##_TypedTS_Injectable::Injectable InjectableInterface; \
-        static const char                                          Name[];                          \
+        static constexpr const char                                Name[] = #data_type_name;        \
     };                                                                                              \
                                                                                                     \
     template <>                                                                                     \
@@ -63,15 +70,6 @@ struct Traits {};
         typedef FACE::DM::model_ns::T_##data_type_name::data_type_name                        DataType; \
         typedef FACE::TSS::model_ns::data_type_name##_TypedTS_Injectable::Injectable InjectableInterface; \
     }
-
-//////////////////////////////////////////////////////////////////////////////////
-/// DEFINE_FACE_TYPE_TRAITS(model_ns, data_type_name)
-///
-/// Provides the out-of-line definition for the Name[] string member declared
-/// by DECLARE_FACE_TYPE_TRAITS.  Place exactly once per type in a .cpp file.
-///
-#define DEFINE_FACE_TYPE_TRAITS(model_ns, data_type_name)                                           \
-    const char Traits<FACE::DM::model_ns::T_##data_type_name::data_type_name>::Name[] = #data_type_name
 
 //////////////////////////////////////////////////////////////////////////////////
 /// DECLARE_FACE_TYPE_TRAITS_COMPOSITE(model_ns, data_type_name)
@@ -92,7 +90,7 @@ struct Traits {};
         typedef FACE::TSS::model_ns::data_type_name::Read_Callback Read_Callback;                   \
         typedef FACE::DM::model_ns::data_type_name                 DataType;                        \
         typedef FACE::TSS::model_ns::data_type_name##_TypedTS_Injectable::Injectable InjectableInterface; \
-        static const char                                          Name[];                          \
+        static constexpr const char                                Name[] = #data_type_name;        \
     };                                                                                              \
                                                                                                     \
     template <>                                                                                     \
@@ -100,15 +98,6 @@ struct Traits {};
         typedef FACE::DM::model_ns::data_type_name                                          DataType; \
         typedef FACE::TSS::model_ns::data_type_name##_TypedTS_Injectable::Injectable InjectableInterface; \
     }
-
-//////////////////////////////////////////////////////////////////////////////////
-/// DEFINE_FACE_TYPE_TRAITS_COMPOSITE(model_ns, data_type_name)
-///
-/// Provides the out-of-line Name[] definition for a CompositeTemplate type.
-/// Place exactly once per type in a .cpp file.
-///
-#define DEFINE_FACE_TYPE_TRAITS_COMPOSITE(model_ns, data_type_name)                                 \
-    const char Traits<FACE::DM::model_ns::data_type_name>::Name[] = #data_type_name
 
 //////////////////////////////////////////////////////////////////////////////////
 /// DECLARE_FACE_TYPE_TRAITS_REQRESP(model_ns, req_name, resp_name)
@@ -138,16 +127,8 @@ struct Traits {};
         typedef FACE::TSS::model_ns::req_name##_##resp_name::TypedTS       TypedTS;                 \
         typedef FACE::TSS::model_ns::req_name##_##resp_name::Read_Callback Read_Callback;            \
         typedef FACE::DM::model_ns::T_##req_name::req_name                 DataType;                \
-        static const char                                                  Name[];                  \
+        static constexpr const char                                        Name[] = #req_name;      \
     }
-
-/// DEFINE_FACE_TYPE_TRAITS_REQRESP(model_ns, req_name, resp_name)
-///
-/// Out-of-line Name[] definition for DECLARE_FACE_TYPE_TRAITS_REQRESP.
-/// Place exactly once per request/response pair in a .cpp file.
-///
-#define DEFINE_FACE_TYPE_TRAITS_REQRESP(model_ns, req_name, resp_name)                              \
-    const char Traits<FACE::DM::model_ns::T_##req_name::req_name>::Name[] = #req_name
 
 /// DECLARE_FACE_TYPE_TRAITS_REQRESP_COMPOSITE(model_ns, req_name, resp_name)
 ///
@@ -161,15 +142,8 @@ struct Traits {};
         typedef FACE::TSS::model_ns::req_name##_##resp_name::TypedTS       TypedTS;                 \
         typedef FACE::TSS::model_ns::req_name##_##resp_name::Read_Callback Read_Callback;            \
         typedef FACE::DM::model_ns::req_name                               DataType;                \
-        static const char                                                  Name[];                  \
+        static constexpr const char                                        Name[] = #req_name;      \
     }
-
-/// DEFINE_FACE_TYPE_TRAITS_REQRESP_COMPOSITE(model_ns, req_name, resp_name)
-///
-/// Out-of-line Name[] definition for DECLARE_FACE_TYPE_TRAITS_REQRESP_COMPOSITE.
-///
-#define DEFINE_FACE_TYPE_TRAITS_REQRESP_COMPOSITE(model_ns, req_name, resp_name)                    \
-    const char Traits<FACE::DM::model_ns::req_name>::Name[] = #req_name
 
 //////////////////////////////////////////////////////////////////////////////////
 /// Convenience wrappers — single-model codebases can define DEFAULT_NAMESPACE
@@ -187,13 +161,7 @@ struct Traits {};
 #define DECLARE_FACE_TYPE_TRAITS_DEFAULT(data_type_name) \
     DECLARE_FACE_TYPE_TRAITS(DEFAULT_NAMESPACE, data_type_name)
 
-#define DEFINE_FACE_TYPE_TRAITS_DEFAULT(data_type_name) \
-    DEFINE_FACE_TYPE_TRAITS(DEFAULT_NAMESPACE, data_type_name)
-
 #define DECLARE_FACE_TYPE_TRAITS_COMPOSITE_DEFAULT(data_type_name) \
     DECLARE_FACE_TYPE_TRAITS_COMPOSITE(DEFAULT_NAMESPACE, data_type_name)
-
-#define DEFINE_FACE_TYPE_TRAITS_COMPOSITE_DEFAULT(data_type_name) \
-    DEFINE_FACE_TYPE_TRAITS_COMPOSITE(DEFAULT_NAMESPACE, data_type_name)
 
 #endif // FACETYPETRAITS_H
