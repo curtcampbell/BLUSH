@@ -6,17 +6,21 @@
 ##
 ## Collect unique TssTypeData values by UUID (first-seen order)
 ##
+## CLIENT_SERVER (request/response) connections are excluded here: their TSS
+## transport is a single combined FACE::TSS::<ns>::<reqName>_<respName>::TypedTS
+## module (see face-idl-gen's typed_ts_extended.vtl), not one TypedTS per
+## individual message type -- so DECLARE_FACE_TYPE_TRAITS's 1:1
+## type<->TypedTS-module assumption (FaceTypeTraits.h) does not hold for
+## either the request or the response type. Mirrors the same guard in
+## UoPBase.h.vm. Traits for CLIENT_SERVER request/response types are a
+## face-utils gap, not something this template can paper over.
 #set ($uniqueTypes = [])
 #set ($seenUuids   = [])
 #foreach ($conn in $uop.connections)
-  #if (!$seenUuids.contains($conn.messageType.uuid))
-    #if ($uniqueTypes.add($conn.messageType))#end
-    #if ($seenUuids.add($conn.messageType.uuid))#end
-  #end
-  #if ($conn.responseMessageType)
-    #if (!$seenUuids.contains($conn.responseMessageType.uuid))
-      #if ($uniqueTypes.add($conn.responseMessageType))#end
-      #if ($seenUuids.add($conn.responseMessageType.uuid))#end
+  #if ($conn.kind.name() != "CLIENT_SERVER")
+    #if (!$seenUuids.contains($conn.messageType.uuid))
+      #if ($uniqueTypes.add($conn.messageType))#end
+      #if ($seenUuids.add($conn.messageType.uuid))#end
     #end
   #end
 #end
@@ -24,6 +28,21 @@
 ## Derive include-guard symbol from UoP name
 ##
 #set ($guardSymbol = "${uop.name.toUpperCase()}_TYPE_TRAITS_H")
+##
+## CLIENT_SERVER connections: collect (request, response) pairs. Deduped by
+## request UUID -- RequesterConnection/ResponderConnection (face-utils) key
+## entirely off the request type, so that's the natural dedup key.
+##
+#set ($reqRespPairs = [])
+#set ($seenReqUuids = [])
+#foreach ($conn in $uop.connections)
+  #if ($conn.kind.name() == "CLIENT_SERVER")
+    #if (!$seenReqUuids.contains($conn.messageType.uuid))
+      #if ($reqRespPairs.add($conn))#end
+      #if ($seenReqUuids.add($conn.messageType.uuid))#end
+    #end
+  #end
+#end
 ##
 ## Collect unique model namespaces so we can include each one's convenience
 ## header (FACE/DM/<ns>/<ns>.hpp) -- DECLARE_FACE_TYPE_TRAITS below needs the
@@ -35,6 +54,11 @@
     #if ($modelNamespaces.add($type.modelNamespace))#end
   #end
 #end
+#foreach ($conn in $reqRespPairs)
+  #if (!$modelNamespaces.contains($conn.messageType.modelNamespace))
+    #if ($modelNamespaces.add($conn.messageType.modelNamespace))#end
+  #end
+#end
 #ifndef ${guardSymbol}
 \#define ${guardSymbol}
 
@@ -42,12 +66,40 @@
 #foreach ($ns in $modelNamespaces)
 \#include "FACE/DM/${ns}/${ns}.hpp"
 #end
+## DECLARE_FACE_TYPE_TRAITS(_COMPOSITE) below needs FACE::TSS::<ns>::<name>::TypedTS
+## and FACE::TSS::<ns>::<name>_TypedTS_Injectable::Injectable already visible --
+## unlike the DM side, there is no per-namespace aggregate header for TSS, so
+## each type's own headers must be included directly. TypedTS.hpp MUST come
+## first: TypedTS_Injectable.hpp references <name>::TypedTS by fully-qualified
+## name but (a known generator gap, see BUG-struct-field-namespace-qualification.md)
+## does not itself #include the header that declares it.
+#foreach ($type in $uniqueTypes)
+\#include "FACE/TSS/${type.modelNamespace}/${type.name}/TypedTS.hpp"
+\#include "FACE/TSS/${type.modelNamespace}/${type.name}_TypedTS_Injectable/TypedTS_Injectable.hpp"
+#end
+## Extended (CLIENT_SERVER) TypedTS lives at a COMBINED path keyed by BOTH
+## names (typed_ts_extended.vtl), not the request name alone.
+#foreach ($conn in $reqRespPairs)
+\#include "FACE/TSS/${conn.messageType.modelNamespace}/${conn.messageType.name}_${conn.responseMessageType.name}/TypedTS.hpp"
+#end
 
+## DECLARE_FACE_TYPE_TRAITS(_COMPOSITE)'s expansion ends in a bare closing
+## "}" with no trailing ";" (the caller supplies it, same convention as any
+## C-style statement macro) -- omitting it here previously went unnoticed
+## because compilation always failed earlier, upstream at the
+## TypedTS_Injectable gap this fixed.
 #foreach ($type in $uniqueTypes)
   #if ($type.compositeTemplate)
-DECLARE_FACE_TYPE_TRAITS_COMPOSITE($type.modelNamespace, $type.name)
+DECLARE_FACE_TYPE_TRAITS_COMPOSITE($type.modelNamespace, $type.name);
   #else
-DECLARE_FACE_TYPE_TRAITS($type.modelNamespace, $type.name)
+DECLARE_FACE_TYPE_TRAITS($type.modelNamespace, $type.name);
+  #end
+#end
+#foreach ($conn in $reqRespPairs)
+  #if ($conn.messageType.compositeTemplate)
+DECLARE_FACE_TYPE_TRAITS_REQRESP_COMPOSITE($conn.messageType.modelNamespace, $conn.messageType.name, $conn.responseMessageType.name);
+  #else
+DECLARE_FACE_TYPE_TRAITS_REQRESP($conn.messageType.modelNamespace, $conn.messageType.name, $conn.responseMessageType.name);
   #end
 #end
 

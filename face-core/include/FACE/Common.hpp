@@ -13,6 +13,14 @@
 #include <cstring>  // for std::memcpy, std::memset
 #include <cstddef>  // for std::size_t
 
+#include <FACE/types.hpp>   // FACE::Short/Long/.../Boolean/Octet (Table 14, §4.14.8.7.1) --
+                             // generated code includes only <FACE/Common.hpp> unconditionally
+                             // and expects these to already be in scope.
+#include <FACE/String.hpp>  // FACE::String (§4.14.8.7.3/§K.2.3) -- unlike FACE::Sequence,
+                             // there is no per-use "string_include" mechanism in the
+                             // generator, and nearly every data-model typedef resolves
+                             // through FACE::String, so it's included unconditionally too.
+
 namespace FACE {
 
 //----------------------------------------------------------------------------

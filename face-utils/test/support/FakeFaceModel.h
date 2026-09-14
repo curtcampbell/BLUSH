@@ -60,9 +60,13 @@ public:
         const Msg&                      message,
         FACE::RETURN_CODE_TYPE&         return_code) = 0;
 
+    // "inout Read_Callback" where Read_Callback is a LOCAL interface (declared
+    // alongside TypedTS in the same template body) maps to Read_Callback**,
+    // not a reference -- matches real generated TypedTS.hpp (confirmed
+    // against FACE/TSS/CORE_Templates/Money/TypedTS.hpp).
     virtual void Register_Callback(
         FACE::TSS::CONNECTION_ID_TYPE connection_id,
-        MsgReadCallback&              callback,
+        MsgReadCallback**             callback,
         FACE::RETURN_CODE_TYPE&       return_code) = 0;
 
     virtual void Unregister_Callback(
@@ -82,7 +86,7 @@ public:
          FACE::TSS::TRANSACTION_ID_TYPE&, const Msg&, FACE::RETURN_CODE_TYPE&),
         (override));
     MOCK_METHOD(void, Register_Callback,
-        (FACE::TSS::CONNECTION_ID_TYPE, MsgReadCallback&, FACE::RETURN_CODE_TYPE&),
+        (FACE::TSS::CONNECTION_ID_TYPE, MsgReadCallback**, FACE::RETURN_CODE_TYPE&),
         (override));
     MOCK_METHOD(void, Unregister_Callback,
         (FACE::TSS::CONNECTION_ID_TYPE, FACE::RETURN_CODE_TYPE&),

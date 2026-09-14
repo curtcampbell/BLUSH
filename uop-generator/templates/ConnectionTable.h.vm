@@ -35,10 +35,17 @@
   #end
 #end
 ##
-## Derive include path from $model_namespace (e.g. FACE::DM::SampleUSM -> FACE/DM/SampleUSM).
-## $model_namespace is injected by IdlDerivedVariables and is always available.
+## Collect unique model namespaces among $uniqueTypes so we can include each
+## one's convenience header -- connections in one IntegrationContext commonly
+## carry types from several different DM namespaces, so a single shared
+## $model_namespace is not safe to use for every type's include/qualification.
 ##
-#set ($incPath = $model_namespace.replace("::", "/"))
+#set ($modelNamespaces = [])
+#foreach ($type in $uniqueTypes)
+  #if (!$modelNamespaces.contains($type.modelNamespace))
+    #if ($modelNamespaces.add($type.modelNamespace))#end
+  #end
+#end
 ##
 ## Derive include-guard symbol from UoP name + IntegrationContext name.
 ##
@@ -51,8 +58,8 @@
 \#include "EventDispatcher.h"
 \#include "FACE/Common.hpp"
 
-#foreach ($type in $uniqueTypes)
-\#include "${incPath}/${type.name}.hpp"
+#foreach ($ns in $modelNamespaces)
+\#include "FACE/DM/${ns}/${ns}.hpp"
 #end
 
 namespace ${uop.name} {
@@ -65,7 +72,7 @@ namespace ${uop.name} {
 /// Passed to RESPONDER connection handlers; call sendResponse() when the
 /// reply is ready.
 struct I${rspType.name}ResponseSender {
-    virtual void sendResponse(const ::${model_namespace}::${rspType.name}& response) = 0;
+    virtual void sendResponse(const ::${rspType.modelNamespaceQualified}::${rspType.name}& response) = 0;
     virtual ~I${rspType.name}ResponseSender() = default;
 };
 
@@ -101,7 +108,7 @@ public:
     /// Send outbound message on connection ${conn.name}.
     /// @returns NO_ERROR on success; NOT_AVAILABLE if connection is not wired.
     virtual FACE::RETURN_CODE_TYPE send${conn.name}(
-        const ::${model_namespace}::${conn.messageType.name}& msg) = 0;
+        const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}& msg) = 0;
 
 #elseif ($conn.role.toString() == "CONSUMER")
     /// Register handler for inbound messages on connection ${conn.name}.
@@ -111,16 +118,16 @@ public:
     /// predicate — optional filter evaluated before each dispatch;
     ///             an empty (default) predicate always passes.
     virtual std::shared_ptr<EventRegistration> register${conn.name}Handler(
-        std::function<void(const ::${model_namespace}::${conn.messageType.name}&)> handler,
-        std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate = {}) = 0;
+        std::function<void(const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}&)> handler,
+        std::function<bool(const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}&)> predicate = {}) = 0;
 
 #elseif ($conn.role.toString() == "REQUESTER")
     /// Send request on connection ${conn.name}.
     /// responseCallback is invoked asynchronously when the reply arrives.
     /// @returns NO_ERROR or IN_PROGRESS on success; NOT_AVAILABLE if connection is not wired.
     virtual FACE::RETURN_CODE_TYPE send${conn.name}(
-        const ::${model_namespace}::${conn.messageType.name}& request,
-        std::function<void(const ::${model_namespace}::${conn.responseMessageType.name}&)> responseCallback) = 0;
+        const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}& request,
+        std::function<void(const ::${conn.responseMessageType.modelNamespaceQualified}::${conn.responseMessageType.name}&)> responseCallback) = 0;
 
 #elseif ($conn.role.toString() == "RESPONDER")
     /// Register handler for inbound requests on connection ${conn.name}.
@@ -133,9 +140,9 @@ public:
     ///             an empty (default) predicate always passes.
     virtual std::shared_ptr<EventRegistration> register${conn.name}Handler(
         std::function<void(
-            const ::${model_namespace}::${conn.messageType.name}& request,
+            const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}& request,
             I${conn.responseMessageType.name}ResponseSender& sender)> handler,
-        std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate = {}) = 0;
+        std::function<bool(const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}&)> predicate = {}) = 0;
 
 #end
 #end

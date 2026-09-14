@@ -83,8 +83,14 @@ public:
         auto reg = m_dispatcher.Register(std::move(wrapped));
 
         if (m_handlerCount == 0) {
+            // Register_Callback's callback parameter is "inout Read_Callback"
+            // where Read_Callback is a LOCAL interface (declared alongside
+            // TypedTS in the same Typed<DATATYPE_TYPE> template body) --
+            // FACE TS 3.2's C++ mapping for that shape is Read_Callback**,
+            // not a reference (confirmed against real generated TypedTS.hpp).
             FACE::RETURN_CODE_TYPE rc;
-            m_ts->Register_Callback(m_connectionId, *this, rc);
+            ReadCallback* selfPtr = this;
+            m_ts->Register_Callback(m_connectionId, &selfPtr, rc);
         }
         ++m_handlerCount;
 

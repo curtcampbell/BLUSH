@@ -47,14 +47,18 @@ void ${uop.name}Base::Framework_Connect(
 {
     // Use the override container name if the executive provided one via
     // Configure(); otherwise default to the UoP's own config container.
+    // FACE::STRING_TYPE has no empty()/implicit-const-char*-conversion (its
+    // sole non-default constructor is explicit) -- compare against a
+    // default-constructed (zeroed) instance instead.
+    const bool configurationProvided = !(configuration == FACE::CONFIGURATION_RESOURCE());
     const FACE::CONFIGURATION_RESOURCE containerName =
-        (!configuration.empty()) ? configuration
-                                 : FACE::CONFIGURATION_RESOURCE("${uop.name}-config");
+        configurationProvided ? configuration
+                              : FACE::CONFIGURATION_RESOURCE("${uop.name}-config");
 
     // Retrieve the platform Configuration service from the injection store.
     FACE::Configuration* configSvc = nullptr;
     try {
-        configSvc = GetInjected<FACE::Configuration*>("system");
+        configSvc = GetInjected<FACE::Configuration*>(FACE::STRING_TYPE("system"));
     } catch (...) {
         // TODO: log — Configuration service not injected
         return_code = FACE::RETURN_CODE_TYPE::NOT_AVAILABLE;
@@ -62,7 +66,9 @@ void ${uop.name}Base::Framework_Connect(
     }
 
     // Open a session on the configuration container.
-    FACE::HANDLE_TYPE handle{};
+    // HANDLE_TYPE/BUFFER_SIZE_TYPE/SET_NAME_TYPE are nested inside
+    // FACE::Configuration (scoped per the IDL interface), not plain FACE::.
+    FACE::Configuration::HANDLE_TYPE handle{};
     FACE::RETURN_CODE_TYPE rc = FACE::RETURN_CODE_TYPE::NO_ERROR;
     configSvc->Open(containerName, handle, rc);
     if (rc != FACE::RETURN_CODE_TYPE::NO_ERROR) {
@@ -72,8 +78,8 @@ void ${uop.name}Base::Framework_Connect(
     }
 
     // Determine the byte size of the "configuration" set.
-    FACE::BUFFER_SIZE_TYPE size = 0;
-    configSvc->Get_Size(handle, "configuration", size, rc);
+    FACE::Configuration::BUFFER_SIZE_TYPE size = 0;
+    configSvc->Get_Size(handle, FACE::Configuration::SET_NAME_TYPE("configuration"), size, rc);
     if (rc != FACE::RETURN_CODE_TYPE::NO_ERROR) {
         // TODO: log — Get_Size failed
         FACE::RETURN_CODE_TYPE closeRc;
@@ -84,10 +90,10 @@ void ${uop.name}Base::Framework_Connect(
 
     // Read the XML string into a null-terminated buffer.
     std::string xmlBuffer(static_cast<std::size_t>(size) + 1u, '\0');
-    FACE::BUFFER_SIZE_TYPE bytesRead = 0;
+    FACE::Configuration::BUFFER_SIZE_TYPE bytesRead = 0;
     FACE::RETURN_CODE_TYPE readRc = FACE::RETURN_CODE_TYPE::NO_ERROR;
     configSvc->Read(handle,
-                    "configuration",
+                    FACE::Configuration::SET_NAME_TYPE("configuration"),
                     reinterpret_cast<FACE::SYSTEM_ADDRESS_TYPE>(xmlBuffer.data()),
                     size,
                     bytesRead,

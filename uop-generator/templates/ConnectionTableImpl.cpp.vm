@@ -16,23 +16,23 @@ FACE::RETURN_CODE_TYPE ${uop.name}${integrationContext.name}ConnectionTableImpl:
 #foreach ($conn in $integrationContext.connections)
 #if ($conn.role.toString() == "PRODUCER")
     m_${conn.name}Connection =
-        resolver.CreatePubConnection<::${model_namespace}::${conn.messageType.name}>("${conn.name}");
+        resolver.CreatePubConnection<::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}>("${conn.name}");
 
 #elseif ($conn.role.toString() == "CONSUMER")
     m_${conn.name}Connection =
-        resolver.CreateSubConnection<::${model_namespace}::${conn.messageType.name}>("${conn.name}");
+        resolver.CreateSubConnection<::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}>("${conn.name}");
 
 #elseif ($conn.role.toString() == "REQUESTER")
     m_${conn.name}Connection =
         resolver.CreateReqConnection<
-            ::${model_namespace}::${conn.messageType.name},
-            ::${model_namespace}::${conn.responseMessageType.name}>("${conn.name}");
+            ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name},
+            ::${conn.responseMessageType.modelNamespaceQualified}::${conn.responseMessageType.name}>("${conn.name}");
 
 #elseif ($conn.role.toString() == "RESPONDER")
     m_${conn.name}Connection =
         resolver.CreateRspConnection<
-            ::${model_namespace}::${conn.messageType.name},
-            ::${model_namespace}::${conn.responseMessageType.name},
+            ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name},
+            ::${conn.responseMessageType.modelNamespaceQualified}::${conn.responseMessageType.name},
             I${conn.responseMessageType.name}ResponseSender>("${conn.name}");
 
 #end
@@ -49,7 +49,7 @@ FACE::RETURN_CODE_TYPE ${uop.name}${integrationContext.name}ConnectionTableImpl:
 // TransportChannel: ${integrationContext.transportChannelName}
 // ----------------------------------------------------------------------------
 FACE::RETURN_CODE_TYPE ${uop.name}${integrationContext.name}ConnectionTableImpl::send${conn.name}(
-    const ::${model_namespace}::${conn.messageType.name}& msg)
+    const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}& msg)
 {
     if (!m_${conn.name}Connection) { return FACE::RETURN_CODE_TYPE::NOT_AVAILABLE; }
     return m_${conn.name}Connection->send(msg);
@@ -61,8 +61,8 @@ FACE::RETURN_CODE_TYPE ${uop.name}${integrationContext.name}ConnectionTableImpl:
 // TransportChannel: ${integrationContext.transportChannelName}
 // ----------------------------------------------------------------------------
 std::shared_ptr<EventRegistration> ${uop.name}${integrationContext.name}ConnectionTableImpl::register${conn.name}Handler(
-    std::function<void(const ::${model_namespace}::${conn.messageType.name}&)> handler,
-    std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate)
+    std::function<void(const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}&)> handler,
+    std::function<bool(const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}&)> predicate)
 {
     if (!m_${conn.name}Connection) { return nullptr; }
     return m_${conn.name}Connection->registerHandler(std::move(handler), std::move(predicate));
@@ -74,8 +74,8 @@ std::shared_ptr<EventRegistration> ${uop.name}${integrationContext.name}Connecti
 // TransportChannel: ${integrationContext.transportChannelName}
 // ----------------------------------------------------------------------------
 FACE::RETURN_CODE_TYPE ${uop.name}${integrationContext.name}ConnectionTableImpl::send${conn.name}(
-    const ::${model_namespace}::${conn.messageType.name}& request,
-    std::function<void(const ::${model_namespace}::${conn.responseMessageType.name}&)> responseCallback)
+    const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}& request,
+    std::function<void(const ::${conn.responseMessageType.modelNamespaceQualified}::${conn.responseMessageType.name}&)> responseCallback)
 {
     if (!m_${conn.name}Connection) { return FACE::RETURN_CODE_TYPE::NOT_AVAILABLE; }
     return m_${conn.name}Connection->send(request, std::move(responseCallback));
@@ -88,9 +88,9 @@ FACE::RETURN_CODE_TYPE ${uop.name}${integrationContext.name}ConnectionTableImpl:
 // ----------------------------------------------------------------------------
 std::shared_ptr<EventRegistration> ${uop.name}${integrationContext.name}ConnectionTableImpl::register${conn.name}Handler(
     std::function<void(
-        const ::${model_namespace}::${conn.messageType.name}& request,
+        const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}& request,
         I${conn.responseMessageType.name}ResponseSender& sender)> handler,
-    std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate)
+    std::function<bool(const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}&)> predicate)
 {
     if (!m_${conn.name}Connection) { return nullptr; }
     return m_${conn.name}Connection->registerHandler(std::move(handler), std::move(predicate));

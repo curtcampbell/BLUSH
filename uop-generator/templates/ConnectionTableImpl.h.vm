@@ -58,47 +58,47 @@ public:
 #foreach ($conn in $integrationContext.connections)
 #if ($conn.role.toString() == "PRODUCER")
     FACE::RETURN_CODE_TYPE send${conn.name}(
-        const ::${model_namespace}::${conn.messageType.name}& msg) override;
+        const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}& msg) override;
 
 #elseif ($conn.role.toString() == "CONSUMER")
     std::shared_ptr<EventRegistration> register${conn.name}Handler(
-        std::function<void(const ::${model_namespace}::${conn.messageType.name}&)> handler,
-        std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate = {}) override;
+        std::function<void(const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}&)> handler,
+        std::function<bool(const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}&)> predicate = {}) override;
 
 #elseif ($conn.role.toString() == "REQUESTER")
     FACE::RETURN_CODE_TYPE send${conn.name}(
-        const ::${model_namespace}::${conn.messageType.name}& request,
-        std::function<void(const ::${model_namespace}::${conn.responseMessageType.name}&)> responseCallback) override;
+        const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}& request,
+        std::function<void(const ::${conn.responseMessageType.modelNamespaceQualified}::${conn.responseMessageType.name}&)> responseCallback) override;
 
 #elseif ($conn.role.toString() == "RESPONDER")
     std::shared_ptr<EventRegistration> register${conn.name}Handler(
         std::function<void(
-            const ::${model_namespace}::${conn.messageType.name}& request,
+            const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}& request,
             I${conn.responseMessageType.name}ResponseSender& sender)> handler,
-        std::function<bool(const ::${model_namespace}::${conn.messageType.name}&)> predicate = {}) override;
+        std::function<bool(const ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}&)> predicate = {}) override;
 
 #end
 #end
 private:
 #foreach ($conn in $integrationContext.connections)
 #if ($conn.role.toString() == "PRODUCER")
-    std::unique_ptr<PublisherConnection<::${model_namespace}::${conn.messageType.name}>>
+    std::unique_ptr<PublisherConnection<::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}>>
         m_${conn.name}Connection;
 
 #elseif ($conn.role.toString() == "CONSUMER")
-    std::unique_ptr<SubscriberConnection<::${model_namespace}::${conn.messageType.name}>>
+    std::unique_ptr<SubscriberConnection<::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name}>>
         m_${conn.name}Connection;
 
 #elseif ($conn.role.toString() == "REQUESTER")
     std::unique_ptr<RequesterConnection<
-        ::${model_namespace}::${conn.messageType.name},
-        ::${model_namespace}::${conn.responseMessageType.name}>>
+        ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name},
+        ::${conn.responseMessageType.modelNamespaceQualified}::${conn.responseMessageType.name}>>
         m_${conn.name}Connection;
 
 #elseif ($conn.role.toString() == "RESPONDER")
     std::unique_ptr<ResponderConnection<
-        ::${model_namespace}::${conn.messageType.name},
-        ::${model_namespace}::${conn.responseMessageType.name},
+        ::${conn.messageType.modelNamespaceQualified}::${conn.messageType.name},
+        ::${conn.responseMessageType.modelNamespaceQualified}::${conn.responseMessageType.name},
         I${conn.responseMessageType.name}ResponseSender>>
         m_${conn.name}Connection;
 

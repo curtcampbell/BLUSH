@@ -13,7 +13,17 @@
     #end
   #end
 #end
-#set ($incPath = $model_namespace.replace("::", "/"))
+##
+## Collect unique model namespaces among $uniqueTypes -- connections commonly
+## carry types from several different DM namespaces, so a single shared
+## $model_namespace is not safe to use for every type's include/qualification.
+##
+#set ($modelNamespaces = [])
+#foreach ($type in $uniqueTypes)
+  #if (!$modelNamespaces.contains($type.modelNamespace))
+    #if ($modelNamespaces.add($type.modelNamespace))#end
+  #end
+#end
 #set ($guardSymbol = "${uop.name.toUpperCase()}_BASE_H")
 #set ($myIcs = [])
 #foreach ($ic in $integrationContexts)
@@ -45,8 +55,8 @@
 #end
 
 // FACE data-model types used by this UoP
-#foreach ($type in $uniqueTypes)
-\#include "${incPath}/${type.name}.hpp"
+#foreach ($ns in $modelNamespaces)
+\#include "FACE/DM/${ns}/${ns}.hpp"
 #end
 
 namespace ${uop.name} {
@@ -64,7 +74,7 @@ class ${uop.name}Base
                             FACE::Configuration_Injectable::Injectable,
                             FACE::Configuration>
 #foreach ($type in $uniqueTypes)
-    , public FaceInjectable<::${model_namespace}::${type.name}>
+    , public FaceInjectable<::${type.modelNamespaceQualified}::${type.name}>
 #end
     , public FACE::LCM::Initializable::InitializableInstance
     , public FACE::LCM::Connectable::ConnectableInstance

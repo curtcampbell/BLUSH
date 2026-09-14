@@ -14,7 +14,9 @@ struct Widget { int id = 0; };
 namespace FACE { namespace TSS { namespace TraitsTestModel { namespace Widget {
 class TypedTS {};
 class Read_Callback {};
-namespace TypedTS_Injectable { class Injectable {}; }
+}}}}
+namespace FACE { namespace TSS { namespace TraitsTestModel { namespace Widget_TypedTS_Injectable {
+class Injectable {};
 }}}}
 
 DECLARE_FACE_TYPE_TRAITS(TraitsTestModel, Widget);
@@ -28,7 +30,9 @@ struct Gadget { int id = 0; };
 namespace FACE { namespace TSS { namespace TraitsTestModel { namespace Gadget {
 class TypedTS {};
 class Read_Callback {};
-namespace TypedTS_Injectable { class Injectable {}; }
+}}}}
+namespace FACE { namespace TSS { namespace TraitsTestModel { namespace Gadget_TypedTS_Injectable {
+class Injectable {};
 }}}}
 
 DECLARE_FACE_TYPE_TRAITS_COMPOSITE(TraitsTestModel, Gadget);
@@ -42,7 +46,9 @@ struct Sprocket { int id = 0; };
 namespace FACE { namespace TSS { namespace UVC { namespace Sprocket {
 class TypedTS {};
 class Read_Callback {};
-namespace TypedTS_Injectable { class Injectable {}; }
+}}}}
+namespace FACE { namespace TSS { namespace UVC { namespace Sprocket_TypedTS_Injectable {
+class Injectable {};
 }}}}
 
 DECLARE_FACE_TYPE_TRAITS_DEFAULT(Sprocket);
@@ -63,8 +69,12 @@ static_assert(std::is_same<Traits<WidgetDM>::DataType, WidgetDM>::value,
 static_assert(std::is_same<Traits<WidgetTypedTS>::DataType, WidgetDM>::value,
               "Traits<TypedTS>::DataType should point back to the DM type");
 static_assert(std::is_same<Traits<WidgetTypedTS>::InjectableInterface,
-                            FACE::TSS::TraitsTestModel::Widget::TypedTS_Injectable::Injectable>::value,
+                            FACE::TSS::TraitsTestModel::Widget_TypedTS_Injectable::Injectable>::value,
               "Traits<TypedTS>::InjectableInterface should resolve correctly");
+static_assert(std::is_same<Traits<WidgetDM>::InjectableInterface,
+                            FACE::TSS::TraitsTestModel::Widget_TypedTS_Injectable::Injectable>::value,
+              "Traits<DM type>::InjectableInterface should resolve correctly too "
+              "(FaceInjectable<DataType> looks it up via Traits<DataType>, i.e. the DM-keyed specialisation)");
 
 using GadgetDM      = FACE::DM::TraitsTestModel::Gadget;
 using GadgetTypedTS = FACE::TSS::TraitsTestModel::Gadget::TypedTS;

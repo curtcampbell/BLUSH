@@ -6,26 +6,58 @@
 ##
 ## Collect unique TssTypeData values by UUID (first-seen order)
 ##
+## CLIENT_SERVER (request/response) connections are excluded here: their TSS
+## transport is a single combined FACE::TSS::<ns>::<reqName>_<respName>::TypedTS
+## module, not one TypedTS per individual message type, so
+## DECLARE/DEFINE_FACE_TYPE_TRAITS's 1:1 type<->TypedTS-module assumption does
+## not hold. This set must mirror UoPTypeTraits.h.vm's $uniqueTypes exactly,
+## since every DEFINE_FACE_TYPE_TRAITS here pairs with a DECLARE_FACE_TYPE_TRAITS
+## there.
 #set ($uniqueTypes = [])
 #set ($seenUuids   = [])
 #foreach ($conn in $uop.connections)
-  #if (!$seenUuids.contains($conn.messageType.uuid))
-    #if ($uniqueTypes.add($conn.messageType))#end
-    #if ($seenUuids.add($conn.messageType.uuid))#end
+  #if ($conn.kind.name() != "CLIENT_SERVER")
+    #if (!$seenUuids.contains($conn.messageType.uuid))
+      #if ($uniqueTypes.add($conn.messageType))#end
+      #if ($seenUuids.add($conn.messageType.uuid))#end
+    #end
   #end
-  #if ($conn.responseMessageType)
-    #if (!$seenUuids.contains($conn.responseMessageType.uuid))
-      #if ($uniqueTypes.add($conn.responseMessageType))#end
-      #if ($seenUuids.add($conn.responseMessageType.uuid))#end
+#end
+##
+## CLIENT_SERVER connections: same (request, response) pair collection as
+## UoPTypeTraits.h.vm -- must mirror it exactly, since every
+## DEFINE_FACE_TYPE_TRAITS_REQRESP(_COMPOSITE) here pairs with a
+## DECLARE_FACE_TYPE_TRAITS_REQRESP(_COMPOSITE) there.
+##
+#set ($reqRespPairs = [])
+#set ($seenReqUuids = [])
+#foreach ($conn in $uop.connections)
+  #if ($conn.kind.name() == "CLIENT_SERVER")
+    #if (!$seenReqUuids.contains($conn.messageType.uuid))
+      #if ($reqRespPairs.add($conn))#end
+      #if ($seenReqUuids.add($conn.messageType.uuid))#end
     #end
   #end
 #end
 \#include "${uop.name}TypeTraits.h"
 
+## DEFINE_FACE_TYPE_TRAITS(_COMPOSITE)'s expansion ends in a bare
+## out-of-line member-initializer with no trailing ";" (the caller supplies
+## it, same convention as any C-style statement macro) -- omitting it here
+## previously went unnoticed because compilation always failed earlier, at
+## DECLARE_FACE_TYPE_TRAITS's own missing ";" (see UoPTypeTraits.h.vm) or
+## upstream at the TypedTS_Injectable gap this fixed.
 #foreach ($type in $uniqueTypes)
   #if ($type.compositeTemplate)
-DEFINE_FACE_TYPE_TRAITS_COMPOSITE($type.modelNamespace, $type.name)
+DEFINE_FACE_TYPE_TRAITS_COMPOSITE($type.modelNamespace, $type.name);
   #else
-DEFINE_FACE_TYPE_TRAITS($type.modelNamespace, $type.name)
+DEFINE_FACE_TYPE_TRAITS($type.modelNamespace, $type.name);
+  #end
+#end
+#foreach ($conn in $reqRespPairs)
+  #if ($conn.messageType.compositeTemplate)
+DEFINE_FACE_TYPE_TRAITS_REQRESP_COMPOSITE($conn.messageType.modelNamespace, $conn.messageType.name, $conn.responseMessageType.name);
+  #else
+DEFINE_FACE_TYPE_TRAITS_REQRESP($conn.messageType.modelNamespace, $conn.messageType.name, $conn.responseMessageType.name);
   #end
 #end

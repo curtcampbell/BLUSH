@@ -28,7 +28,7 @@ TEST(SubscriberConnectionTest, FirstRegisterHandlerRegistersCallbackOnce) {
 
     EXPECT_CALL(ts, Register_Callback(kConnectionId, _, _))
         .Times(1)
-        .WillOnce(Invoke([](FACE::TSS::CONNECTION_ID_TYPE, FaceUtilsTest::MsgReadCallback&,
+        .WillOnce(Invoke([](FACE::TSS::CONNECTION_ID_TYPE, FaceUtilsTest::MsgReadCallback**,
                              FACE::RETURN_CODE_TYPE& rc) {
             rc = FACE::RETURN_CODE_TYPE::NO_ERROR;
         }));
