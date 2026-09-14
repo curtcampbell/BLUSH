@@ -27,6 +27,7 @@ if(NOT DEFINED CMAKE_POSITION_INDEPENDENT_CODE)
 endif()
 
 option(BLUSH_BUILD_TESTS "Build BLUSH tests" ON)
+option(BLUSH_BUILD_SAMPLE_PROJECT "Build the sample-project demonstration UoPs" ON)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -64,6 +65,10 @@ add_subdirectory(face-core)
 add_subdirectory(face-utils)
 add_subdirectory(data-model)
 add_subdirectory(uop-generator)
+
+if(BLUSH_BUILD_SAMPLE_PROJECT)
+    add_subdirectory(sample-project)
+endif()
 
 # ---------------------------------------------------------------------------
 # Package export so downstream projects can find_package(BLUSH)
